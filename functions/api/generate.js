@@ -198,15 +198,16 @@ async function handleEdit(data, apiKey, context) {
             }
         ],
         generationConfig: {
-            responseModalities: ['TEXT', 'IMAGE'],
-            // Safety/Filter settings (minimal blocking)
-            safetySettings: [
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-            ]
+            responseModalities: ['TEXT', 'IMAGE']
+            // safetySettings removed from here
         },
+        // *** FIX: safetySettings moved to the top level ***
+        safetySettings: [
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+        ]
     };
 
     const response = await fetch(apiUrl, {
@@ -227,6 +228,10 @@ async function handleEdit(data, apiKey, context) {
     if (!base64) {
         console.error("Gemini Edit API Error: No image data in response", result);
         const errorText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        // Check for safety rating blocks
+        if (result?.candidates?.[0]?.finishReason === 'SAFETY') {
+             return new Response(JSON.stringify({ error: `Edit failed: Image blocked due to safety settings.` }), { status: 500 });
+        }
         return new Response(JSON.stringify({ error: `Edit failed: ${errorText || 'No image data returned'}` }), { status: 500 });
     }
 
@@ -253,3 +258,4 @@ async function handleEdit(data, apiKey, context) {
         headers: { 'Content-Type': 'application/json' },
     });
 }
+
