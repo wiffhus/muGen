@@ -1,647 +1,741 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-gray-100">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>muGen - AI Image Generator</title>
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide-react@latest/dist/lucide.umd.js"></script>
-    <!-- Inter Font (similar to San Francisco) -->
-    <link rel="preconnect" href="https://rsms.me/">
-    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
-    
+    <!-- Lucide Icons (we will inline necessary SVGs, but this is for reference) -->
+    <!-- <script src="https://unpkg.com/lucide-dev"></script> -->
     <style>
+        /* Inter Font (Mac-like) */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
         }
-        
-        /* Mac-like scrollbar (optional but nice) */
-        ::-webkit-scrollbar {
-            width: 5px;
-            height: 5px;
+
+        /* Custom scrollbar for sidebar */
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 4px;
         }
-        ::-webkit-scrollbar-track {
-            background: transparent;
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+            border-radius: 4px;
         }
-        ::-webkit-scrollbar-thumb {
-            background: #c1c1c1;
-            border-radius: 10px;
+        .sidebar-scroll::-webkit-scrollbar-track {
+            background-color: #1f2937;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #a1a1a1;
-        }
-        
+
         /* Dynamic Noise Animation */
-        @keyframes noise {
+        .noise-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #111827;
+            z-index: 10;
+            display: none; /* Hidden by default */
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .noise-container.active {
+            display: block;
+            opacity: 1;
+        }
+        .noise-container::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            background-size: 128px 128px;
+            opacity: 0.15;
+            animation: noise-animation 0.2s linear infinite;
+        }
+        @keyframes noise-animation {
             0% { transform: translate(0, 0); }
             10% { transform: translate(-5%, -5%); }
             20% { transform: translate(-10%, 5%); }
             30% { transform: translate(5%, -10%); }
             40% { transform: translate(-5%, 15%); }
-            50% { transform: translate(-10%, 5%); }
+            50% { transform: translate(-10%, -5%); }
             60% { transform: translate(15%, 0); }
             70% { transform: translate(0, 10%); }
             80% { transform: translate(-15%, 0); }
             90% { transform: translate(10%, 5%); }
             100% { transform: translate(5%, 0); }
         }
-        .noise-container {
-            position: relative;
-            overflow: hidden;
-            background: #1a1a1a;
-        }
-        .noise-container::before {
-            content: "";
-            position: absolute;
-            top: -100%;
-            left: -100%;
-            width: 300%;
-            height: 300%;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 800'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-            background-size: 256px 256px;
-            opacity: 0.15;
-            animation: noise 0.2s infinite linear;
-            will-change: transform;
+
+        /* Custom Checkbox */
+        .style-checkbox:checked + label {
+            background-color: #4f46e5;
+            border-color: #4f46e5;
+            color: #ffffff;
         }
 
-        /* Hide scrollbar for style selection */
-        .style-grid::-webkit-scrollbar {
+        /* Modal styles */
+        .modal {
             display: none;
+            position: fixed;
+            z-index: 50;
+            inset: 0;
+            overflow-y: auto;
+            background-color: rgba(0, 0, 0, 0.7);
+            align-items: center;
+            justify-content: center;
         }
-        .style-grid {
-            -ms-overflow-style: none; /* IE and Edge */
-            scrollbar-width: none; /* Firefox */
+        .modal.flex {
+            display: flex;
+        }
+
+        /* Tooltip */
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #1f2937;
+            color: #ffffff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 60;
+            opacity: 1;
+            transition: opacity 0.2s;
         }
     </style>
 </head>
-<body class="h-full flex antialiased">
+<body class="bg-gray-900 text-gray-100 h-screen w-screen overflow-hidden flex">
+
+    <!-- Inline SVG Icons Definition -->
+    <svg width="0" height="0" class="hidden">
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-menu">
+            <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-x">
+            <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-translate">
+            <path d="M5 12h14M12 19l-7-7 7-7"></path><path d="M12 5v14"></path><path d="M19 12h-7"></path>
+            <path d="m18 3 4 4-4 4"></path><path d="m6 3-4 4 4 4"></path>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-send">
+            <line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-image">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-edit">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-copy">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-refresh">
+            <polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-loader">
+            <line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+        </symbol>
+    </svg>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-64 bg-gray-200/80 backdrop-blur-sm border-r border-gray-300/60 p-4 flex-col fixed inset-y-0 left-0 transform -translate-x-full transition-transform duration-300 ease-in-out z-30 md:translate-x-0 md:relative">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-800">History</h2>
-            <button id="close-sidebar" class="md:hidden text-gray-600 hover:text-gray-900">
-                <i data-lucide="x" class="w-5 h-5"></i>
+    <aside id="sidebar" class="bg-gray-800 h-full w-64 p-4 flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-xl font-bold text-white">muGen History</h1>
+            <button id="close-sidebar" class="md:hidden text-gray-400 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
             </button>
         </div>
-        <div id="history-container" class="flex-1 overflow-y-auto space-y-3">
+        <div id="history-container" class="flex-1 overflow-y-auto sidebar-scroll space-y-2">
             <!-- History items will be injected here by JS -->
-            <p id="history-loading" class="text-gray-500 text-sm">Loading history...</p>
-            <p id="history-empty" class="text-gray-500 text-sm hidden">No history found.</p>
+            <p class="text-gray-400 text-sm">No generated images yet.</p>
         </div>
     </aside>
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col h-full relative">
-        <!-- Header Bar (for mobile menu) -->
-        <header class="md:hidden bg-gray-100/80 backdrop-blur-sm sticky top-0 z-20 border-b border-gray-300/60">
-            <div class="flex items-center justify-between p-3">
-                <button id="open-sidebar" class="text-gray-700 hover:text-gray-900">
-                    <i data-lucide="menu" class="w-6 h-6"></i>
-                </button>
-                <h1 class="text-lg font-bold text-gray-800">muGen</h1>
-                <div class="w-6"></div> <!-- Spacer -->
+    <main id="main-content" class="flex-1 h-full flex flex-col transition-all duration-300 ease-in-out md:ml-64">
+        
+        <!-- Header -->
+        <header class="flex-shrink-0 bg-gray-900/70 backdrop-blur-sm h-16 flex items-center px-6 shadow-md z-20">
+            <button id="open-sidebar" class="md:hidden text-gray-400 hover:text-white mr-4">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-menu"></use></svg>
+            </button>
+            <div class="flex items-center space-x-2">
+                <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>
+                <span class="text-lg font-semibold text-white">muGen Image Generator</span>
+            </div>
+            <!-- Mac-like dots (non-functional) -->
+            <div class="flex space-x-2 ml-4">
+                <div class="w-3 h-3 rounded-full bg-gray-700"></div>
+                <div class="w-3 h-3 rounded-full bg-gray-700"></div>
+                <div class="w-3 h-3 rounded-full bg-gray-700"></div>
             </div>
         </header>
 
-        <!-- Generation Area -->
-        <main class="flex-1 flex items-center justify-center p-4 md:p-8 overflow-hidden">
-            <div id="image-display-area" class="w-full h-full max-w-3xl max-h-[70vh] bg-gray-200/50 rounded-lg border border-gray-300/70 shadow-inner flex items-center justify-center transition-all duration-300">
-                <!-- Default state -->
-                <div id="image-placeholder" class="text-center text-gray-500">
-                    <i data-lucide="image" class="w-16 h-16 mx-auto mb-2 opacity-60"></i>
-                    <p>Your generated image will appear here</p>
+        <!-- Image Generation Area -->
+        <div class="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-hidden">
+            <div id="image-display" class="w-full h-full max-w-3xl max-h-[70vh] flex items-center justify-center bg-gray-800 rounded-lg shadow-inner relative">
+                <img id="generated-image" src="" alt="Generated Image" class="hidden max-w-full max-h-full object-contain rounded-lg">
+                <div id="placeholder" class="text-gray-500">
+                    <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>
+                    <p class="mt-2">Your generated image will appear here</p>
                 </div>
-                <!-- Loading state -->
-                <div id="loading-animation" class="noise-container w-full h-full rounded-lg flex items-center justify-center text-white/50 hidden">
-                    <p class="z-10 animate-pulse">Generating...</p>
-                </div>
-                <!-- Image result -->
-                <img id="result-image" src="" alt="Generated image" class="w-full h-full object-contain rounded-lg hidden">
-            </div>
-        </main>
 
-        <!-- Prompt Area -->
-        <footer class="bg-gray-100/90 backdrop-blur-sm border-t border-gray-300/60 p-4 z-10 shadow-up">
-            <div class="max-w-4xl mx-auto">
-                
-                <!-- Options Row -->
-                <div class="flex flex-wrap gap-x-4 gap-y-2 mb-3 items-center">
-                    <!-- Model Select -->
-                    <div>
-                        <label for="model-select" class="text-xs font-medium text-gray-600">Model</label>
-                        <select id="model-select" class="block w-full text-sm bg-white/0 border-gray-300/70 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5 px-2 border">
-                            <option value="imagen-3.0-generate">Imagen 3</option>
-                            <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
+                <!-- Loading Noise Animation -->
+                <div id="loading-animation" class="noise-container">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <svg class="w-12 h-12 text-indigo-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-loader"></use></svg>
+                    </div>
+                </div>
+
+                <!-- Edit Button -->
+                <button id="edit-button" class="hidden absolute top-4 right-4 bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-full shadow-lg transition" data-tooltip="Edit Image">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Prompt Input Area -->
+        <footer class="flex-shrink-0 p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm z-10">
+            <form id="generation-form" class="max-w-4xl mx-auto">
+                <!-- Options Toolbar -->
+                <div class="flex flex-wrap gap-4 mb-4" id="options-toolbar">
+                    <!-- Model -->
+                    <div class_id="model-select-group">
+                        <label for="model-select" class="block text-sm font-medium text-gray-300 mb-1">Model</label>
+                        <select id="model-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
+                            <option value="imagen-3.0-generate">Imagen 3.0</option>
+                            <option value="gemini-2.5-flash-image">Gemini 2.5 Flash (Edit)</option>
                         </select>
                     </div>
                     <!-- Aspect Ratio -->
-                    <div>
-                        <label for="aspect-ratio-select" class="text-xs font-medium text-gray-600">Aspect Ratio</label>
-                        <select id="aspect-ratio-select" class="block w-full text-sm bg-white/0 border-gray-300/70 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5 px-2 border">
-                            <option value="1:1">1:1</option>
-                            <option value="16:9">16:9</option>
-                            <option value="9:16">9:16</option>
-                            <option value="4:3">4:3</option>
-                            <option value="3:2">3:2</option>
+                    <div class_id="aspect-ratio-group">
+                        <label for="aspect-ratio-select" class="block text-sm font-medium text-gray-300 mb-1">Aspect Ratio</label>
+                        <select id="aspect-ratio-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
+                            <option value="1:1">1:1 Square</option>
+                            <option value="16:9">16:9 Landscape</option>
+                            <option value="9:16">9:16 Portrait</option>
+                            <option value="4:3">4:3 Standard</option>
+                            <option value="3:2">3:2 Photo</option>
                         </select>
                     </div>
-                    <!-- Retry -->
-                    <div>
-                        <label for="retry-select" class="text-xs font-medium text-gray-600">Auto Retry</label>
-                        <select id="retry-select" class="block w-full text-sm bg-white/0 border-gray-300/70 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5 px-2 border">
+                    <!-- Auto Retry -->
+                    <div class_id="auto-retry-group">
+                        <label for="auto-retry-select" class="block text-sm font-medium text-gray-300 mb-1">Auto Retry</label>
+                        <select id="auto-retry-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
                             <option value="0">Off</option>
-                            <option value="3">3</option>
-                            <option value="5">5</option>
-                            <option value="10">10</option>
+                            <option value="3">3 Times</option>
+                            <option value="5">5 Times</option>
+                            <option value="10">10 Times</option>
+                            <option value="-1">Custom...</option>
                         </select>
                     </div>
-                    <!-- Styles Button -->
-                    <button id="style-toggle" class="self-end text-sm text-gray-600 bg-white/0 border border-gray-300/70 rounded-md py-1.5 px-3 hover:bg-gray-200/50 shadow-sm">
-                        <i data-lucide="palette" class="w-4 h-4 inline-block mr-1.5"></i>Styles
-                    </button>
-                    <!-- Edit Button -->
-                    <button id="edit-button" class="self-end text-sm text-blue-600 bg-white/0 border border-blue-400/70 rounded-md py-1.5 px-3 hover:bg-blue-50/50 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        <i data-lucide="edit" class="w-4 h-4 inline-block mr-1.5"></i>Edit
-                    </button>
                 </div>
 
-                <!-- Style Selector (hidden by default) -->
-                <div id="style-selector" class="hidden mb-3 p-3 bg-gray-200/60 rounded-lg max-h-40 overflow-y-auto style-grid">
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                        <!-- Styles will be populated by JS -->
+                <!-- Styles (Scrollable) -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Styles (Optional, multiple)</label>
+                    <div class="flex overflow-x-auto space-x-2 pb-2">
+                        <!-- Styles will be injected here by JS -->
                     </div>
                 </div>
 
                 <!-- Prompt Input -->
                 <div class="relative">
-                    <textarea id="prompt-input" rows="2" class="block w-full text-sm text-gray-800 bg-white/80 border-gray-300/70 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 pr-28 resize-none" placeholder="Enter your prompt..."></textarea>
-                    <div class="absolute bottom-2 right-2 flex items-center space-x-1.5">
-                        <button id="translate-button" title="Translate to English" class="text-gray-500 hover:text-blue-600 p-1.5 rounded-md hover:bg-gray-200/50 disabled:opacity-50">
-                            <i data-lucide="languages" class="w-5 h-5"></i>
+                    <textarea id="prompt-input" rows="2" class="block w-full p-4 pr-32 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Enter your prompt... (Non-English will be translated)"></textarea>
+                    <div class="absolute bottom-3 right-3 flex space-x-2">
+                        <button id="translate-button" type="button" class="p-2 bg-gray-600 text-gray-300 rounded-lg hover:bg-gray-500 transition" data-tooltip="Translate to English">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-translate"></use></svg>
                         </button>
-                        <button id="generate-button" title="Generate Image" class="bg-blue-600 text-white rounded-md p-1.5 shadow-sm hover:bg-blue-700 disabled:bg-blue-400">
-                            <i data-lucide="send" class="w-5 h-5"></i>
+                        <button id="generate-button" type="submit" class="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition" data-tooltip="Generate">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-send"></use></svg>
                         </button>
                     </div>
                 </div>
-            </div>
+            </form>
         </footer>
-    </div>
+    </main>
 
-    <!-- History Item Modal -->
-    <div id="history-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-lg shadow-2xl max-w-xl w-full relative">
-            <!-- Close button -->
-            <button id="modal-close" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800">
-                <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-            
-            <img id="modal-image" src="" alt="History image" class="w-full h-auto max-h-[70vh] object-contain rounded-t-lg bg-gray-100">
-            
-            <div class="p-4">
-                <p class="text-xs text-gray-500 mb-1">Prompt:</p>
-                <div class="relative bg-gray-100 rounded-md p-2 max-h-28 overflow-y-auto">
-                    <p id="modal-prompt" class="text-sm text-gray-800 break-words"></p>
-                    <button id="modal-copy-prompt" class="absolute top-1 right-1 text-gray-500 hover:text-blue-600 p-1 rounded hover:bg-gray-200">
-                        <i data-lucide="copy" class="w-4 h-4"></i>
+    <!-- Image Modal -->
+    <div id="image-modal" class="modal">
+        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col p-4">
+            <img id="modal-image" src="" class="max-w-full max-h-[70vh] object-contain mx-auto">
+            <div class="p-4 bg-gray-900 rounded-b-lg mt-4">
+                <p class="text-sm text-gray-300 mb-2">Prompt:</p>
+                <p id="modal-prompt" class="text-white bg-gray-700 p-3 rounded-lg"></p>
+                <div class="flex space-x-4 mt-4">
+                    <button id="modal-copy" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition" data-tooltip="Copy Prompt">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-copy"></use></svg>
+                        <span>Copy</span>
+                    </button>
+                    <button id="modal-regenerate" class="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg transition" data-tooltip="Regenerate Image">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-refresh"></use></svg>
+                        <span>Regenerate</span>
                     </button>
                 </div>
-                <button id="modal-regenerate" class="mt-3 w-full text-sm text-blue-600 bg-blue-50 border border-blue-400/70 rounded-md py-2 px-3 hover:bg-blue-100/50 shadow-sm">
-                    <i data-lucide="rotate-cw" class="w-4 h-4 inline-block mr-1.5"></i>Regenerate
-                </button>
             </div>
+            <button id="modal-close" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
+            </button>
         </div>
     </div>
-    
-    <!-- Error/Message Popup -->
-    <div id="toast-message" class="fixed bottom-5 right-5 bg-red-600 text-white py-2 px-4 rounded-lg shadow-xl transform translate-x-[120%] transition-transform duration-300 ease-in-out z-50">
-        <p id="toast-text">An error occurred.</p>
+
+    <!-- Message/Toast Notification -->
+    <div id="toast" class="fixed top-20 right-6 bg-green-600 text-white py-2 px-6 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50">
+        <p id="toast-message">Message</p>
     </div>
 
-    <script type="module">
-        // Lucide Icons activation
-        lucide.createIcons();
-
-        // --- DOM Elements ---
-        const sidebar = document.getElementById('sidebar');
-        const openSidebarBtn = document.getElementById('open-sidebar');
-        const closeSidebarBtn = document.getElementById('close-sidebar');
-        
-        const promptInput = document.getElementById('prompt-input');
-        const translateBtn = document.getElementById('translate-button');
-        const generateBtn = document.getElementById('generate-button');
-        const editBtn = document.getElementById('edit-button');
-        
-        const modelSelect = document.getElementById('model-select');
-        const aspectSelect = document.getElementById('aspect-ratio-select');
-        const retrySelect = document.getElementById('retry-select');
-        
-        const styleToggleBtn = document.getElementById('style-toggle');
-        const styleSelector = document.getElementById('style-selector');
-        
-        const imageDisplayArea = document.getElementById('image-display-area');
-        const imagePlaceholder = document.getElementById('image-placeholder');
-        const loadingAnimation = document.getElementById('loading-animation');
-        const resultImage = document.getElementById('result-image');
-        
-        const historyContainer = document.getElementById('history-container');
-        const historyLoading = document.getElementById('history-loading');
-        const historyEmpty = document.getElementById('history-empty');
-
-        const modal = document.getElementById('history-modal');
-        const modalCloseBtn = document.getElementById('modal-close');
-        const modalImage = document.getElementById('modal-image');
-        const modalPrompt = document.getElementById('modal-prompt');
-        const modalCopyBtn = document.getElementById('modal-copy-prompt');
-        const modalRegenerateBtn = document.getElementById('modal-regenerate');
-
-        const toast = document.getElementById('toast-message');
-        const toastText = document.getElementById('toast-text');
-
-        // --- App State ---
-        let currentImageBase64 = null;
-        let isGenerating = false;
-        let isEditing = false;
-        const stylesList = [
+    <script>
+        // --- CONSTANTS & STATE ---
+        const STYLES = [
             "Photorealistic", "Cinematic", "35mm film", "Black and white", "Impressionistic",
             "Surrealism", "Watercolour", "Ukiyo-e", "Cyberpunk", "Steampunk",
             "Fantasy art", "Minimalism", "Animation", "Ghibli-style", "Disney-style"
         ];
         
-        // --- Helper Functions ---
+        let db;
+        let apiKeyCounter = 0; // For API Key Rotation
+        let currentEditImageBase64 = null; // For image editing
+        let isEditingMode = false;
 
-        /**
-         * Shows a toast message (default: error)
-         * @param {string} message The message to display
-         * @param {boolean} [isError=true] Whether this is an error (red) or success (green)
-         */
-        function showToast(message, isError = true) {
-            toastText.innerText = message;
-            toast.className = toast.className.replace(/bg-red-600|bg-green-600/, isError ? 'bg-red-600' : 'bg-green-600');
-            
-            toast.classList.remove('translate-x-[120%]');
-            setTimeout(() => {
-                toast.classList.add('translate-x-[120%]');
-            }, 3000);
-        }
-
-        /**
-         * Sets the loading state of the app
-         * @param {boolean} isLoading Whether the app is loading
-         */
-        function setLoadingState(isLoading) {
-            isGenerating = isLoading;
-            generateBtn.disabled = isLoading;
-            translateBtn.disabled = isLoading;
-            promptInput.disabled = isLoading;
-            
-            if (isLoading) {
-                imagePlaceholder.classList.add('hidden');
-                resultImage.classList.add('hidden');
-                loadingAnimation.classList.remove('hidden');
-            } else {
-                loadingAnimation.classList.add('hidden');
-                // We don't hide the result image, that's handled by success/failure
-            }
-        }
+        // --- DOM ELEMENTS ---
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
+        const openSidebarBtn = document.getElementById('open-sidebar');
+        const closeSidebarBtn = document.getElementById('close-sidebar');
+        const generationForm = document.getElementById('generation-form');
+        const promptInput = document.getElementById('prompt-input');
+        const translateButton = document.getElementById('translate-button');
+        const generateButton = document.getElementById('generate-button');
+        const loadingAnimation = document.getElementById('loading-animation');
+        const imageDisplay = document.getElementById('image-display');
+        const generatedImage = document.getElementById('generated-image');
+        const placeholder = document.getElementById('placeholder');
+        const historyContainer = document.getElementById('history-container');
         
-        /**
-         * Fetches and retries a request
-         * @param {string} url The URL to fetch
-         * @param {object} options The fetch options
-         * @param {number} maxRetries Maximum number of retries
-         * @returns {Promise<Response>}
-         */
-        async function fetchWithRetry(url, options, maxRetries) {
-            let attempt = 0;
-            while (attempt <= maxRetries) {
-                try {
-                    const response = await fetch(url, options);
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({ error: 'Network response was not ok.' }));
-                        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-                    }
-                    return response; // Success
-                } catch (error) {
-                    console.error(`Attempt ${attempt + 1} failed:`, error.message);
-                    attempt++;
-                    if (attempt > maxRetries) {
-                        throw error; // Max retries reached
-                    }
-                    // Wait 1s before retrying (exponential backoff is better, but this is simpler)
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                }
-            }
-        }
-
-        // --- Sidebar ---
-        openSidebarBtn.addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
-        closeSidebarBtn.addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+        const modelSelect = document.getElementById('model-select');
+        const aspectRatioSelect = document.getElementById('aspect-ratio-select');
+        const autoRetrySelect = document.getElementById('auto-retry-select');
         
-        // --- Style Selector ---
-        function populateStyles() {
-            const grid = styleSelector.querySelector('.grid');
-            stylesList.forEach(style => {
-                const id = `style-${style.replace(/\s+/g, '-')}`;
-                const div = document.createElement('div');
-                div.className = "flex items-center";
-                div.innerHTML = `
-                    <input id="${id}" name="style-checkbox" type="checkbox" value="${style}" class="h-4 w-4 text-blue-600 border-gray-400 rounded focus:ring-blue-500">
-                    <label for="${id}" class="ml-2 block text-sm text-gray-800">${style}</label>
-                `;
-                grid.appendChild(div);
-            });
-        }
+        const imageModal = document.getElementById('image-modal');
+        const modalImage = document.getElementById('modal-image');
+        const modalPrompt = document.getElementById('modal-prompt');
+        const modalCopy = document.getElementById('modal-copy');
+        const modalRegenerate = document.getElementById('modal-regenerate');
+        const modalClose = document.getElementById('modal-close');
         
-        function getSelectedStyles() {
-            return Array.from(document.querySelectorAll('input[name="style-checkbox"]:checked')).map(cb => cb.value);
-        }
+        const editButton = document.getElementById('edit-button');
+        const optionsToolbar = document.getElementById('options-toolbar');
+        
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
 
-        styleToggleBtn.addEventListener('click', () => {
-            styleSelector.classList.toggle('hidden');
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initDB();
+            initSidebar();
+            initStyles();
+            initListeners();
+            loadHistory();
         });
 
-        // --- History Modal ---
-        modalCloseBtn.addEventListener('click', () => modal.classList.add('hidden'));
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.classList.add('hidden');
-            }
-        });
-        
-        modalCopyBtn.addEventListener('click', () => {
-            // Note: navigator.clipboard.writeText may not work in secure iframes.
-            // Using execCommand as a fallback.
-            try {
-                const textarea = document.createElement('textarea');
-                textarea.value = modalPrompt.innerText;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                showToast('Prompt copied!', false);
-            } catch (err) {
-                console.error('Failed to copy prompt:', err);
-                showToast('Failed to copy prompt.');
-            }
-        });
+        // --- INDEXEDDB ---
+        function initDB() {
+            const request = indexedDB.open("muGenDB", 1);
 
-        modalRegenerateBtn.addEventListener('click', () => {
-            promptInput.value = modalPrompt.innerText;
-            modal.classList.add('hidden');
-            handleGenerate(); // Automatically start generation
-        });
-
-        // --- History Loading ---
-        
-        /**
-         * Creates a history item element
-         * @param {object} item - History item data
-         * @param {string} item.thumbnailUrl - URL for the thumbnail
-         * @param {string} item.fullImageUrl - URL for the full image
-         * @param {string} item.prompt - The prompt used
-         */
-        function createHistoryItem(item) {
-            const div = document.createElement('div');
-            div.className = "cursor-pointer rounded-lg overflow-hidden relative group shadow-md";
-            
-            const img = document.createElement('img');
-            img.src = item.thumbnailUrl; // This should be the Drive thumbnail URL
-            img.alt = "History thumbnail";
-            img.className = "w-full h-auto aspect-square object-cover transition-transform duration-200 group-hover:scale-105";
-            img.onerror = () => {
-                img.src = `https://placehold.co/100x100/e0e0e0/707070?text=Error`;
-                img.alt = "Failed to load image";
+            request.onerror = (event) => {
+                console.error("IndexedDB error:", event.target.errorCode);
+                showToast("Database error. History may not work.", "error");
             };
 
-            const overlay = document.createElement('div');
-            overlay.className = "absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center";
-            overlay.innerHTML = `<i data-lucide="eye" class="w-8 h-8 text-white"></i>`;
-            
-            div.appendChild(img);
-            div.appendChild(overlay);
-            
-            div.addEventListener('click', () => {
-                modalImage.src = item.fullImageUrl; // Load full image on click
-                modalPrompt.innerText = item.prompt;
-                modal.classList.remove('hidden');
-            });
-            
-            return div;
+            request.onupgradeneeded = (event) => {
+                db = event.target.result;
+                const objectStore = db.createObjectStore("images", { keyPath: "id", autoIncrement: true });
+                objectStore.createIndex("timestamp", "timestamp", { unique: false });
+                objectStore.createIndex("prompt", "prompt", { unique: false });
+            };
+
+            request.onsuccess = (event) => {
+                db = event.target.result;
+                console.log("IndexedDB initialized.");
+            };
         }
 
-        async function loadHistory() {
-            try {
-                historyLoading.classList.remove('hidden');
-                historyEmpty.classList.add('hidden');
-                
-                // Call our Cloudflare API endpoint, which calls GAS
-                const response = await fetch('/api/history');
-                
-                if (!response.ok) {
-                    throw new Error('Failed to fetch history.');
+        function saveImageToDB(prompt, translatedPrompt, base64Data) {
+            if (!db) return;
+            const transaction = db.transaction(["images"], "readwrite");
+            const objectStore = transaction.objectStore("images");
+            const newItem = {
+                prompt: prompt,
+                translatedPrompt: translatedPrompt,
+                base64: base64Data,
+                timestamp: new Date().getTime()
+            };
+            const request = objectStore.add(newItem);
+
+            request.onsuccess = () => {
+                console.log("Image saved to DB");
+                loadHistory(); // Refresh history
+            };
+            request.onerror = (event) => {
+                console.error("Error saving to DB:", event.target.error);
+                // Handle potential quota errors
+                if (event.target.error.name === 'QuotaExceededError') {
+                    showToast("History storage is full. Clearing old entries...", "warning");
+                    clearOldHistory();
                 }
-                
-                const historyData = await response.json();
-                
-                historyContainer.innerHTML = ''; // Clear loading/empty text
-                
-                if (!historyData || historyData.length === 0) {
-                    historyContainer.appendChild(historyEmpty);
-                    historyEmpty.classList.remove('hidden');
+            };
+        }
+
+        function loadHistory() {
+            if (!db) return;
+            const transaction = db.transaction(["images"], "readonly");
+            const objectStore = transaction.objectStore("images");
+            const index = objectStore.index("timestamp");
+            const request = index.getAll(null, 100); // Get latest 100
+
+            request.onsuccess = () => {
+                const items = request.result.reverse(); // Newest first
+                historyContainer.innerHTML = "";
+                if (items.length === 0) {
+                    historyContainer.innerHTML = '<p class="text-gray-400 text-sm">No generated images yet.</p>';
                     return;
                 }
-                
-                // Data format from GAS: [{ prompt, fullImageUrl, thumbnailUrl }]
-                historyData.forEach(item => {
-                    const itemEl = createHistoryItem(item);
-                    historyContainer.appendChild(itemEl);
+                items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = "cursor-pointer rounded-lg overflow-hidden relative group";
+                    div.innerHTML = `
+                        <img src="${item.base64}" alt="History thumbnail" class="w-full h-auto object-cover">
+                        <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <p class="text-white text-xs p-2 truncate">${item.prompt}</p>
+                        </div>
+                    `;
+                    div.addEventListener('click', () => showImageInModal(item.base64, item.prompt, item.translatedPrompt));
+                    historyContainer.appendChild(div);
                 });
-                
-                lucide.createIcons(); // Re-render icons in the history items
+            };
+        }
+        
+        function clearOldHistory() {
+            // Simple: clear all. Better: clear oldest N.
+            if (!db) return;
+            const transaction = db.transaction(["images"], "readwrite");
+            const objectStore = transaction.objectStore("images");
+            objectStore.clear().onsuccess = () => {
+                showToast("Old history cleared.", "success");
+                loadHistory();
+            };
+        }
 
-            } catch (error) {
-                console.error('Error loading history:', error);
-                historyLoading.classList.add('hidden');
-                historyContainer.appendChild(historyEmpty);
-                historyEmpty.innerText = "Failed to load history.";
-                historyEmpty.classList.remove('hidden');
+        // --- UI INITIALIZATION ---
+
+        function initSidebar() {
+            openSidebarBtn.addEventListener('click', () => {
+                sidebar.classList.remove('-translate-x-full');
+                mainContent.classList.add('md:ml-0');
+            });
+            closeSidebarBtn.addEventListener('click', () => {
+                sidebar.classList.add('-translate-x-full');
+                mainContent.classList.remove('md:ml-0');
+            });
+        }
+
+        function initStyles() {
+            const container = document.querySelector('.overflow-x-auto');
+            STYLES.forEach(style => {
+                const div = document.createElement('div');
+                div.className = "flex-shrink-0";
+                div.innerHTML = `
+                    <input type="checkbox" id="style-${style}" value="${style}" class="hidden style-checkbox">
+                    <label for="style-${style}" class="cursor-pointer bg-gray-700 text-gray-300 border border-gray-600 rounded-full px-4 py-2 text-sm font-medium hover:bg-gray-600 transition">
+                        ${style}
+                    </label>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- EVENT LISTENERS ---
+        function initListeners() {
+            generationForm.addEventListener('submit', handleGenerationSubmit);
+            translateButton.addEventListener('click', handleTranslate);
+            
+            modalClose.addEventListener('click', () => imageModal.classList.remove('flex'));
+            modalCopy.addEventListener('click', handleModalCopy);
+            modalRegenerate.addEventListener('click', handleModalRegenerate);
+            
+            editButton.addEventListener('click', toggleEditMode);
+            
+            modelSelect.addEventListener('change', () => {
+                if (modelSelect.value === 'gemini-2.5-flash-image') {
+                    if (!currentEditImageBase64) {
+                        showToast("Please generate an image first to use Edit mode.", "warning");
+                        modelSelect.value = 'imagen-3.0-generate';
+                    } else {
+                        toggleEditMode(true);
+                    }
+                } else {
+                    toggleEditMode(false);
+                }
+            });
+            
+            autoRetrySelect.addEventListener('change', () => {
+                if(autoRetrySelect.value === '-1') {
+                    const customRetry = prompt("Enter number of retries:", "15");
+                    if (customRetry && !isNaN(parseInt(customRetry))) {
+                        const val = parseInt(customRetry);
+                        // Add this as a new option
+                        const newOption = new Option(`${val} Times (Custom)`, val, true, true);
+                        autoRetrySelect.add(newOption);
+                    } else {
+                        autoRetrySelect.value = '0'; // Reset
+                    }
+                }
+            });
+        }
+        
+        // --- CORE LOGIC ---
+
+        function toggleEditMode(forceOn = null) {
+            isEditingMode = forceOn !== null ? forceOn : !isEditingMode;
+            
+            if (isEditingMode) {
+                if (!currentEditImageBase64) {
+                    showToast("No image to edit. Generate an image first.", "warning");
+                    isEditingMode = false;
+                    return;
+                }
+                modelSelect.value = 'gemini-2.5-flash-image';
+                promptInput.placeholder = "Enter edit instructions (e.g., 'make the sky blue', 'add a hat')...";
+                generateButton.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>`;
+                optionsToolbar.style.display = 'none'; // Hide options not applicable to editing
+                imageDisplay.classList.add('ring-4', 'ring-indigo-500');
+            } else {
+                modelSelect.value = 'imagen-3.0-generate';
+                promptInput.placeholder = "Enter your prompt... (Non-English will be translated)";
+                generateButton.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-send"></use></svg>`;
+                optionsToolbar.style.display = 'flex';
+                imageDisplay.classList.remove('ring-4', 'ring-indigo-500');
             }
         }
 
-        // --- Core API Calls ---
-
-        /**
-         * Handle Translation
-         */
         async function handleTranslate() {
             const prompt = promptInput.value;
-            if (!prompt) return;
-            
-            translateBtn.disabled = true;
-            const originalIcon = translateBtn.innerHTML;
-            translateBtn.innerHTML = `<i data-lucide="loader" class="w-5 h-5 animate-spin"></i>`;
-            lucide.createIcons();
-            
+            if (!prompt) {
+                showToast("Please enter text to translate", "warning");
+                return;
+            }
+
+            setLoading(translateButton, true);
+
             try {
-                const response = await fetch('/api/generate', {
+                const response = await fetchWithRetry('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        type: 'translate',
+                        action: 'translate',
                         prompt: prompt
                     })
                 });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Translation failed.');
-                }
-                
+
                 const data = await response.json();
-                promptInput.value = data.translatedText;
-                
+                if (response.ok) {
+                    promptInput.value = data.translatedPrompt;
+                    showToast("Translation successful", "success");
+                } else {
+                    throw new Error(data.error || "Translation failed");
+                }
+
             } catch (error) {
-                console.error('Translation error:', error);
-                showToast(error.message || 'Translation failed.');
+                console.error("Translate error:", error);
+                showToast(error.message, "error");
             } finally {
-                translateBtn.disabled = false;
-                translateBtn.innerHTML = originalIcon;
-                lucide.createIcons();
+                setLoading(translateButton, false);
             }
         }
 
-        /**
-         * Handle Image Generation
-         */
-        async function handleGenerate() {
+        async function handleGenerationSubmit(event) {
+            event.preventDefault();
             const prompt = promptInput.value;
-            if (!prompt || isGenerating) return;
-            
-            setLoadingState(true);
-            currentImageBase64 = null; // Clear previous image
+            if (!prompt) {
+                showToast("Please enter a prompt", "warning");
+                return;
+            }
+
+            setLoading(generateButton, true);
+            loadingAnimation.classList.add('active');
+            placeholder.style.display = 'none';
+            generatedImage.classList.add('hidden');
+            editButton.classList.add('hidden');
+
+            // Collect options
+            const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value);
+            const model = modelSelect.value;
+            apiKeyCounter++; // Increment for rotation
             
             const payload = {
-                type: isEditing ? 'edit' : 'generate',
+                action: isEditingMode ? 'edit' : 'generate',
                 prompt: prompt,
-                model: modelSelect.value,
-                aspectRatio: aspectSelect.value,
-                styles: getSelectedStyles(),
-                base64ImageData: isEditing ? currentImageBase64 : null // Send current image if editing
+                model: model,
+                keyIndex: apiKeyCounter, // Send counter for server-side rotation
+                // Generate options
+                aspectRatio: aspectRatioSelect.value,
+                styles: selectedStyles,
+                // Edit options
+                baseImage: isEditingMode ? currentEditImageBase64 : null
             };
-            
-            const maxRetries = parseInt(retrySelect.value, 10) || 0;
-            
+
+            const retryCount = parseInt(autoRetrySelect.value, 10);
+
             try {
                 const response = await fetchWithRetry('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
-                }, maxRetries);
-                
+                }, retryCount);
+
                 const data = await response.json();
-                
-                if (!data.base64Image) {
-                    throw new Error('No image data received from server.');
-                }
-                
-                currentImageBase64 = data.base64Image;
-                resultImage.src = `data:image/png;base64,${currentImageBase64}`;
-                resultImage.classList.remove('hidden');
-                imagePlaceholder.classList.add('hidden');
-                editBtn.disabled = false;
-                
-                // Save to history (don't wait for it)
-                saveToHistory(prompt, currentImageBase64);
-                
-                // Reset edit state
-                isEditing = false;
-                editBtn.classList.remove('bg-blue-100', 'border-blue-600');
-                
-            } catch (error) {
-                console.error('Generation error:', error);
-                showToast(error.message || 'Generation failed.');
-                imagePlaceholder.classList.remove('hidden'); // Show placeholder again
-                resultImage.classList.add('hidden');
-            } finally {
-                setLoadingState(false);
-            }
-        }
 
-        /**
-         * Handle Edit Button
-         */
-        function handleEditToggle() {
-            if (!currentImageBase64) return; // Can't edit if no image
-            
-            isEditing = !isEditing;
-            
-            if (isEditing) {
-                editBtn.classList.add('bg-blue-100', 'border-blue-600'); // Active state
-                modelSelect.value = 'gemini-2.5-flash-image'; // Editing requires Gemini
-                modelSelect.disabled = true;
-                showToast('Edit mode enabled. Describe your changes.', false);
-            } else {
-                editBtn.classList.remove('bg-blue-100', 'border-blue-600');
-                modelSelect.disabled = false;
-            }
-        }
-
-        /**
-         * Save to Google Drive/Sheet via GAS
-         * @param {string} prompt
-         * @param {string} base64Image
-         */
-        async function saveToHistory(prompt, base64Image) {
-            // We don't need the translated prompt here, as the 'generate'
-            // payload only contains the final prompt used. GAS just saves what it gets.
-            try {
-                const response = await fetch('/api/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        prompt: prompt,
-                        base64Image: base64Image,
-                        timestamp: new Date().toISOString()
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to save to history.');
-                }
-                
-                const saveData = await response.json();
-                
-                // Add new item to the top of the history sidebar
-                if (saveData.success && saveData.historyItem) {
-                    const newItemEl = createHistoryItem(saveData.historyItem);
-                    historyContainer.prepend(newItemEl);
-                    lucide.createIcons();
+                if (response.ok) {
+                    const base64 = `data:image/png;base64,${data.base64}`;
+                    generatedImage.src = base64;
+                    generatedImage.classList.remove('hidden');
                     
-                    // Remove "empty" message if it was there
-                    historyEmpty.classList.add('hidden');
+                    currentEditImageBase64 = data.base64; // Save for editing
+                    
+                    saveImageToDB(prompt, data.translatedPrompt || prompt, base64);
+                    showToast(isEditingMode ? "Edit successful" : "Generation successful", "success");
+                    editButton.classList.remove('hidden');
+                    if(isEditingMode) toggleEditMode(false); // Exit edit mode after successful edit
+                } else {
+                    throw new Error(data.error || "Generation failed");
                 }
-                
+
             } catch (error) {
-                console.error('Save error:', error);
-                // Don't bother the user with a save error, just log it
+                console.error("Generation error:", error);
+                showToast(error.message, "error");
+                placeholder.style.display = 'block'; // Show placeholder again
+            } finally {
+                setLoading(generateButton, false);
+                loadingAnimation.classList.remove('active');
+            }
+        }
+        
+        async function fetchWithRetry(url, options, retries = 0) {
+            let attempt = 0;
+            const maxRetries = retries < 0 ? 0 : retries; // Handle custom/off
+
+            while (attempt <= maxRetries) {
+                try {
+                    if (attempt > 0) {
+                        showToast(`Retrying... (Attempt ${attempt} of ${maxRetries})`, "warning");
+                    }
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        // Throw to trigger retry
+                        const errorData = await response.json().catch(() => ({ error: `Server error: ${response.status}` }));
+                        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                    }
+                    return response; // Success
+                } catch (error) {
+                    console.warn(`Attempt ${attempt} failed:`, error.message);
+                    if (attempt === maxRetries) {
+                        throw error; // Max retries reached, re-throw last error
+                    }
+                    attempt++;
+                    await new Promise(res => setTimeout(res, 1000 * attempt)); // Exponential backoff
+                }
             }
         }
 
-        // --- Event Listeners ---
-        translateBtn.addEventListener('click', handleTranslate);
-        generateBtn.addEventListener('click', handleGenerate);
-        editBtn.addEventListener('click', handleEditToggle);
-
-        // --- Initialisation ---
-        populateStyles();
-        loadHistory();
+        // --- MODAL & TOAST ---
         
+        function showImageInModal(base64, prompt, translatedPrompt) {
+            modalImage.src = base64;
+            modalPrompt.textContent = translatedPrompt || prompt;
+            // Store data for regenerate
+            modalRegenerate.dataset.prompt = prompt;
+            modalRegenerate.dataset.translatedPrompt = translatedPrompt;
+            imageModal.classList.add('flex');
+        }
+        
+        function handleModalCopy() {
+            const textToCopy = modalPrompt.textContent;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showToast("Prompt copied to clipboard!", "success");
+            }).catch(err => {
+                console.error('Clipboard copy failed:', err);
+                // Fallback for non-secure contexts (like sandboxed iframes)
+                try {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = textToCopy;
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showToast("Prompt copied to clipboard!", "success");
+                } catch (fallbackErr) {
+                    console.error('Fallback copy failed:', fallbackErr);
+                    showToast("Failed to copy prompt", "error");
+                }
+            });
+        }
+        
+        function handleModalRegenerate() {
+            const prompt = modalRegenerate.dataset.prompt;
+            promptInput.value = prompt;
+            imageModal.classList.remove('flex');
+            handleGenerationSubmit(new Event('submit')); // Trigger generation
+        }
+
+        function showToast(message, type = "success") {
+            toastMessage.textContent = message;
+            toast.className = `fixed top-20 right-6 text-white py-2 px-6 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50`; // Reset
+            
+            if (type === "error") {
+                toast.classList.add('bg-red-600');
+            } else if (type === "warning") {
+                toast.classList.add('bg-yellow-500');
+            } else {
+                toast.classList.add('bg-green-600');
+            }
+
+            // Animate in
+            toast.classList.remove('opacity-0', '-translate-y-10');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            // Animate out
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-10');
+            }, 3000);
+        }
+        
+        function setLoading(button, isLoading) {
+            const icon = button.querySelector('svg');
+            if (isLoading) {
+                button.disabled = true;
+                if (icon) icon.classList.add('animate-spin'); // Simple spin for loading
+            } else {
+                button.disabled = false;
+                if (icon) icon.classList.remove('animate-spin');
+            }
+        }
+
     </script>
 </body>
 </html>
