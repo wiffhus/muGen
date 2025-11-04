@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>muGen - AI Image Generator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide-react@latest/dist/lucide.umd.js"></script>
+    <!-- Inter Font (similar to San Francisco) -->
+    <link rel="preconnect" href="https://rsms.me/">
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* Mac-like scrollbar (optional but nice) */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+        
+        /* Dynamic Noise Animation */
+        @keyframes noise {
+            0% { transform: translate(0, 0); }
+            10% { transform: translate(-5%, -5%); }
+            20% { transform: translate(-10%, 5%); }
+            30% { transform: translate(5%, -10%); }
+            40% { transform: translate(-5%, 15%); }
+            50% { transform: translate(-10%, 5%); }
+            60% { transform: translate(15%, 0); }
+            70% { transform: translate(0, 10%); }
+            80% { transform: translate(-15%, 0); }
+            90% { transform: translate(10%, 5%); }
+            100% { transform: translate(5%, 0); }
+        }
+        .noise-container {
+            position: relative;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+        .noise-container::before {
+            content: "";
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 800'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            background-size: 256px 256px;
+            opacity: 0.15;
+            animation: noise 0.2s infinite linear;
+            will-change: transform;
+        }
+
+        /* Hide scrollbar for style selection */
+        .style-grid::-webkit-scrollbar {
+            display: none;
+        }
+        .style-grid {
+            -ms-overflow-style: none; /* IE and Edge */
+            scrollbar-width: none; /* Firefox */
+        }
+    </style>
+</head>
+<body class="h-full flex antialiased">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-64 bg-gray-200/80 backdrop-blur-sm border-r border-gray-300/60 p-4 flex-col fixed inset-y-0 left-0 transform -translate-x-full transition-transform duration-300 ease-in-out z-30 md:translate-x-0 md:relative">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-gray-800">History</h2>
+            <button id="close-sidebar" class="md:hidden text-gray-600 hover:text-gray-900">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div id="history-container" class="flex-1 overflow-y-auto space-y-3">
+            <!-- History items will be injected here by JS -->
+            <p id="history-loading" class="text-gray-500 text-sm">Loading history...</p>
+            <p id="history-empty" class="text-gray-500 text-sm hidden">No history found.</p>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col h-full relative">
+        <!-- Header Bar (for mobile menu) -->
+        <header class="md:hidden bg-gray-100/80 backdrop-blur-sm sticky top-0 z-20 border-b border-gray-300/60">
+            <div class="flex items-center justify-between p-3">
+                <button id="open-sidebar" class="text-gray-700 hover:text-gray-900">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+                <h1 class="text-lg font-bold text-gray-800">muGen</h1>
+                <div class="w-6"></div> <!-- Spacer -->
+            </div>
+        </header>
+
+        <!-- Generation Area -->
+        <main class="flex-1 flex items-center justify-center p-4 md:p-8 overflow-hidden">
+            <div id="image-display-area" class="w-full h-full max-w-3xl max-h-[70vh] bg-gray-200/50 rounded-lg border border-gray-300/70 shadow-inner flex items-center justify-center transition-all duration-300">
+                <!-- Default state -->
+                <div id="image-placeholder" class="text-center text-gray-500">
+                    <i data-lucide="image" class="w-16 h-16 mx-auto mb-2 opacity-60"></i>
+                    <p>Your generated image will appear here</p>
+                </div>
+                <!-- Loading state -->
+                <div id="loading-animation" class="noise-container w-full h-full rounded-lg flex items-center justify-center text-white/50 hidden">
+                    <p class="z-10 animate-pulse">Generating...</p>
+                </div>
+                <!-- Image result -->
+                <img id="result-image" src="" alt="Generated image" class="w-full h-full object-contain rounded-lg hidden">
+            </div>
+        </main>
+
+        <!-- Prompt Area -->
+        <footer class="bg-gray-100/90 backdrop-blur-sm border-t border-gray-300/60 p-4 z-10 shadow-up">
+            <div class="max-w-4xl mx-auto">
+                
+                <!-- Options Row -->
+                <div class="flex flex-wrap gap-x-4 gap-y-2 mb-3 items-center">
+                    <!-- Model Select -->
+                    <div>
+                        <label for="model-select" class="text-xs font-medium text-gray-600">Model</label>
+                        <select id="model-select" class="block w-full text-sm bg-white/0 border-gray-300/70 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5 px-2 border">
+                            <option value="imagen-3.0-generate">Imagen 3</option>
+                            <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
+                        </select>
+                    </div>
+                    <!-- Aspect Ratio -->
+                    <div>
+                        <label for="aspect-ratio-select" class="text-xs font-medium text-gray-600">Aspect Ratio</label>
+                        <select id="aspect-ratio-select" class="block w-full text-sm bg-white/0 border-gray-300/70 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5 px-2 border">
+                            <option value="1:1">1:1</option>
+                            <option value="16:9">16:9</option>
+                            <option value="9:16">9:16</option>
+                            <option value="4:3">4:3</option>
+                            <option value="3:2">3:2</option>
+                        </select>
+                    </div>
+                    <!-- Retry -->
+                    <div>
+                        <label for="retry-select" class="text-xs font-medium text-gray-600">Auto Retry</label>
+                        <select id="retry-select" class="block w-full text-sm bg-white/0 border-gray-300/70 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5 px-2 border">
+                            <option value="0">Off</option>
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                        </select>
+                    </div>
+                    <!-- Styles Button -->
+                    <button id="style-toggle" class="self-end text-sm text-gray-600 bg-white/0 border border-gray-300/70 rounded-md py-1.5 px-3 hover:bg-gray-200/50 shadow-sm">
+                        <i data-lucide="palette" class="w-4 h-4 inline-block mr-1.5"></i>Styles
+                    </button>
+                    <!-- Edit Button -->
+                    <button id="edit-button" class="self-end text-sm text-blue-600 bg-white/0 border border-blue-400/70 rounded-md py-1.5 px-3 hover:bg-blue-50/50 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <i data-lucide="edit" class="w-4 h-4 inline-block mr-1.5"></i>Edit
+                    </button>
+                </div>
+
+                <!-- Style Selector (hidden by default) -->
+                <div id="style-selector" class="hidden mb-3 p-3 bg-gray-200/60 rounded-lg max-h-40 overflow-y-auto style-grid">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                        <!-- Styles will be populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Prompt Input -->
+                <div class="relative">
+                    <textarea id="prompt-input" rows="2" class="block w-full text-sm text-gray-800 bg-white/80 border-gray-300/70 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 pr-28 resize-none" placeholder="Enter your prompt..."></textarea>
+                    <div class="absolute bottom-2 right-2 flex items-center space-x-1.5">
+                        <button id="translate-button" title="Translate to English" class="text-gray-500 hover:text-blue-600 p-1.5 rounded-md hover:bg-gray-200/50 disabled:opacity-50">
+                            <i data-lucide="languages" class="w-5 h-5"></i>
+                        </button>
+                        <button id="generate-button" title="Generate Image" class="bg-blue-600 text-white rounded-md p-1.5 shadow-sm hover:bg-blue-700 disabled:bg-blue-400">
+                            <i data-lucide="send" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- History Item Modal -->
+    <div id="history-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-lg shadow-2xl max-w-xl w-full relative">
+            <!-- Close button -->
+            <button id="modal-close" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            
+            <img id="modal-image" src="" alt="History image" class="w-full h-auto max-h-[70vh] object-contain rounded-t-lg bg-gray-100">
+            
+            <div class="p-4">
+                <p class="text-xs text-gray-500 mb-1">Prompt:</p>
+                <div class="relative bg-gray-100 rounded-md p-2 max-h-28 overflow-y-auto">
+                    <p id="modal-prompt" class="text-sm text-gray-800 break-words"></p>
+                    <button id="modal-copy-prompt" class="absolute top-1 right-1 text-gray-500 hover:text-blue-600 p-1 rounded hover:bg-gray-200">
+                        <i data-lucide="copy" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <button id="modal-regenerate" class="mt-3 w-full text-sm text-blue-600 bg-blue-50 border border-blue-400/70 rounded-md py-2 px-3 hover:bg-blue-100/50 shadow-sm">
+                    <i data-lucide="rotate-cw" class="w-4 h-4 inline-block mr-1.5"></i>Regenerate
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Error/Message Popup -->
+    <div id="toast-message" class="fixed bottom-5 right-5 bg-red-600 text-white py-2 px-4 rounded-lg shadow-xl transform translate-x-[120%] transition-transform duration-300 ease-in-out z-50">
+        <p id="toast-text">An error occurred.</p>
+    </div>
+
+    <script type="module">
+        // Lucide Icons activation
+        lucide.createIcons();
+
+        // --- DOM Elements ---
+        const sidebar = document.getElementById('sidebar');
+        const openSidebarBtn = document.getElementById('open-sidebar');
+        const closeSidebarBtn = document.getElementById('close-sidebar');
+        
+        const promptInput = document.getElementById('prompt-input');
+        const translateBtn = document.getElementById('translate-button');
+        const generateBtn = document.getElementById('generate-button');
+        const editBtn = document.getElementById('edit-button');
+        
+        const modelSelect = document.getElementById('model-select');
+        const aspectSelect = document.getElementById('aspect-ratio-select');
+        const retrySelect = document.getElementById('retry-select');
+        
+        const styleToggleBtn = document.getElementById('style-toggle');
+        const styleSelector = document.getElementById('style-selector');
+        
+        const imageDisplayArea = document.getElementById('image-display-area');
+        const imagePlaceholder = document.getElementById('image-placeholder');
+        const loadingAnimation = document.getElementById('loading-animation');
+        const resultImage = document.getElementById('result-image');
+        
+        const historyContainer = document.getElementById('history-container');
+        const historyLoading = document.getElementById('history-loading');
+        const historyEmpty = document.getElementById('history-empty');
+
+        const modal = document.getElementById('history-modal');
+        const modalCloseBtn = document.getElementById('modal-close');
+        const modalImage = document.getElementById('modal-image');
+        const modalPrompt = document.getElementById('modal-prompt');
+        const modalCopyBtn = document.getElementById('modal-copy-prompt');
+        const modalRegenerateBtn = document.getElementById('modal-regenerate');
+
+        const toast = document.getElementById('toast-message');
+        const toastText = document.getElementById('toast-text');
+
+        // --- App State ---
+        let currentImageBase64 = null;
+        let isGenerating = false;
+        let isEditing = false;
+        const stylesList = [
+            "Photorealistic", "Cinematic", "35mm film", "Black and white", "Impressionistic",
+            "Surrealism", "Watercolour", "Ukiyo-e", "Cyberpunk", "Steampunk",
+            "Fantasy art", "Minimalism", "Animation", "Ghibli-style", "Disney-style"
+        ];
+        
+        // --- Helper Functions ---
+
+        /**
+         * Shows a toast message (default: error)
+         * @param {string} message The message to display
+         * @param {boolean} [isError=true] Whether this is an error (red) or success (green)
+         */
+        function showToast(message, isError = true) {
+            toastText.innerText = message;
+            toast.className = toast.className.replace(/bg-red-600|bg-green-600/, isError ? 'bg-red-600' : 'bg-green-600');
+            
+            toast.classList.remove('translate-x-[120%]');
+            setTimeout(() => {
+                toast.classList.add('translate-x-[120%]');
+            }, 3000);
+        }
+
+        /**
+         * Sets the loading state of the app
+         * @param {boolean} isLoading Whether the app is loading
+         */
+        function setLoadingState(isLoading) {
+            isGenerating = isLoading;
+            generateBtn.disabled = isLoading;
+            translateBtn.disabled = isLoading;
+            promptInput.disabled = isLoading;
+            
+            if (isLoading) {
+                imagePlaceholder.classList.add('hidden');
+                resultImage.classList.add('hidden');
+                loadingAnimation.classList.remove('hidden');
+            } else {
+                loadingAnimation.classList.add('hidden');
+                // We don't hide the result image, that's handled by success/failure
+            }
+        }
+        
+        /**
+         * Fetches and retries a request
+         * @param {string} url The URL to fetch
+         * @param {object} options The fetch options
+         * @param {number} maxRetries Maximum number of retries
+         * @returns {Promise<Response>}
+         */
+        async function fetchWithRetry(url, options, maxRetries) {
+            let attempt = 0;
+            while (attempt <= maxRetries) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ error: 'Network response was not ok.' }));
+                        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                    }
+                    return response; // Success
+                } catch (error) {
+                    console.error(`Attempt ${attempt + 1} failed:`, error.message);
+                    attempt++;
+                    if (attempt > maxRetries) {
+                        throw error; // Max retries reached
+                    }
+                    // Wait 1s before retrying (exponential backoff is better, but this is simpler)
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+        }
+
+        // --- Sidebar ---
+        openSidebarBtn.addEventListener('click', () => sidebar.classList.remove('-translate-x-full'));
+        closeSidebarBtn.addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+        
+        // --- Style Selector ---
+        function populateStyles() {
+            const grid = styleSelector.querySelector('.grid');
+            stylesList.forEach(style => {
+                const id = `style-${style.replace(/\s+/g, '-')}`;
+                const div = document.createElement('div');
+                div.className = "flex items-center";
+                div.innerHTML = `
+                    <input id="${id}" name="style-checkbox" type="checkbox" value="${style}" class="h-4 w-4 text-blue-600 border-gray-400 rounded focus:ring-blue-500">
+                    <label for="${id}" class="ml-2 block text-sm text-gray-800">${style}</label>
+                `;
+                grid.appendChild(div);
+            });
+        }
+        
+        function getSelectedStyles() {
+            return Array.from(document.querySelectorAll('input[name="style-checkbox"]:checked')).map(cb => cb.value);
+        }
+
+        styleToggleBtn.addEventListener('click', () => {
+            styleSelector.classList.toggle('hidden');
+        });
+
+        // --- History Modal ---
+        modalCloseBtn.addEventListener('click', () => modal.classList.add('hidden'));
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+        
+        modalCopyBtn.addEventListener('click', () => {
+            // Note: navigator.clipboard.writeText may not work in secure iframes.
+            // Using execCommand as a fallback.
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = modalPrompt.innerText;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('Prompt copied!', false);
+            } catch (err) {
+                console.error('Failed to copy prompt:', err);
+                showToast('Failed to copy prompt.');
+            }
+        });
+
+        modalRegenerateBtn.addEventListener('click', () => {
+            promptInput.value = modalPrompt.innerText;
+            modal.classList.add('hidden');
+            handleGenerate(); // Automatically start generation
+        });
+
+        // --- History Loading ---
+        
+        /**
+         * Creates a history item element
+         * @param {object} item - History item data
+         * @param {string} item.thumbnailUrl - URL for the thumbnail
+         * @param {string} item.fullImageUrl - URL for the full image
+         * @param {string} item.prompt - The prompt used
+         */
+        function createHistoryItem(item) {
+            const div = document.createElement('div');
+            div.className = "cursor-pointer rounded-lg overflow-hidden relative group shadow-md";
+            
+            const img = document.createElement('img');
+            img.src = item.thumbnailUrl; // This should be the Drive thumbnail URL
+            img.alt = "History thumbnail";
+            img.className = "w-full h-auto aspect-square object-cover transition-transform duration-200 group-hover:scale-105";
+            img.onerror = () => {
+                img.src = `https://placehold.co/100x100/e0e0e0/707070?text=Error`;
+                img.alt = "Failed to load image";
+            };
+
+            const overlay = document.createElement('div');
+            overlay.className = "absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center";
+            overlay.innerHTML = `<i data-lucide="eye" class="w-8 h-8 text-white"></i>`;
+            
+            div.appendChild(img);
+            div.appendChild(overlay);
+            
+            div.addEventListener('click', () => {
+                modalImage.src = item.fullImageUrl; // Load full image on click
+                modalPrompt.innerText = item.prompt;
+                modal.classList.remove('hidden');
+            });
+            
+            return div;
+        }
+
+        async function loadHistory() {
+            try {
+                historyLoading.classList.remove('hidden');
+                historyEmpty.classList.add('hidden');
+                
+                // Call our Cloudflare API endpoint, which calls GAS
+                const response = await fetch('/api/history');
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch history.');
+                }
+                
+                const historyData = await response.json();
+                
+                historyContainer.innerHTML = ''; // Clear loading/empty text
+                
+                if (!historyData || historyData.length === 0) {
+                    historyContainer.appendChild(historyEmpty);
+                    historyEmpty.classList.remove('hidden');
+                    return;
+                }
+                
+                // Data format from GAS: [{ prompt, fullImageUrl, thumbnailUrl }]
+                historyData.forEach(item => {
+                    const itemEl = createHistoryItem(item);
+                    historyContainer.appendChild(itemEl);
+                });
+                
+                lucide.createIcons(); // Re-render icons in the history items
+
+            } catch (error) {
+                console.error('Error loading history:', error);
+                historyLoading.classList.add('hidden');
+                historyContainer.appendChild(historyEmpty);
+                historyEmpty.innerText = "Failed to load history.";
+                historyEmpty.classList.remove('hidden');
+            }
+        }
+
+        // --- Core API Calls ---
+
+        /**
+         * Handle Translation
+         */
+        async function handleTranslate() {
+            const prompt = promptInput.value;
+            if (!prompt) return;
+            
+            translateBtn.disabled = true;
+            const originalIcon = translateBtn.innerHTML;
+            translateBtn.innerHTML = `<i data-lucide="loader" class="w-5 h-5 animate-spin"></i>`;
+            lucide.createIcons();
+            
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: 'translate',
+                        prompt: prompt
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Translation failed.');
+                }
+                
+                const data = await response.json();
+                promptInput.value = data.translatedText;
+                
+            } catch (error) {
+                console.error('Translation error:', error);
+                showToast(error.message || 'Translation failed.');
+            } finally {
+                translateBtn.disabled = false;
+                translateBtn.innerHTML = originalIcon;
+                lucide.createIcons();
+            }
+        }
+
+        /**
+         * Handle Image Generation
+         */
+        async function handleGenerate() {
+            const prompt = promptInput.value;
+            if (!prompt || isGenerating) return;
+            
+            setLoadingState(true);
+            currentImageBase64 = null; // Clear previous image
+            
+            const payload = {
+                type: isEditing ? 'edit' : 'generate',
+                prompt: prompt,
+                model: modelSelect.value,
+                aspectRatio: aspectSelect.value,
+                styles: getSelectedStyles(),
+                base64ImageData: isEditing ? currentImageBase64 : null // Send current image if editing
+            };
+            
+            const maxRetries = parseInt(retrySelect.value, 10) || 0;
+            
+            try {
+                const response = await fetchWithRetry('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }, maxRetries);
+                
+                const data = await response.json();
+                
+                if (!data.base64Image) {
+                    throw new Error('No image data received from server.');
+                }
+                
+                currentImageBase64 = data.base64Image;
+                resultImage.src = `data:image/png;base64,${currentImageBase64}`;
+                resultImage.classList.remove('hidden');
+                imagePlaceholder.classList.add('hidden');
+                editBtn.disabled = false;
+                
+                // Save to history (don't wait for it)
+                saveToHistory(prompt, currentImageBase64);
+                
+                // Reset edit state
+                isEditing = false;
+                editBtn.classList.remove('bg-blue-100', 'border-blue-600');
+                
+            } catch (error) {
+                console.error('Generation error:', error);
+                showToast(error.message || 'Generation failed.');
+                imagePlaceholder.classList.remove('hidden'); // Show placeholder again
+                resultImage.classList.add('hidden');
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        /**
+         * Handle Edit Button
+         */
+        function handleEditToggle() {
+            if (!currentImageBase64) return; // Can't edit if no image
+            
+            isEditing = !isEditing;
+            
+            if (isEditing) {
+                editBtn.classList.add('bg-blue-100', 'border-blue-600'); // Active state
+                modelSelect.value = 'gemini-2.5-flash-image'; // Editing requires Gemini
+                modelSelect.disabled = true;
+                showToast('Edit mode enabled. Describe your changes.', false);
+            } else {
+                editBtn.classList.remove('bg-blue-100', 'border-blue-600');
+                modelSelect.disabled = false;
+            }
+        }
+
+        /**
+         * Save to Google Drive/Sheet via GAS
+         * @param {string} prompt
+         * @param {string} base64Image
+         */
+        async function saveToHistory(prompt, base64Image) {
+            // We don't need the translated prompt here, as the 'generate'
+            // payload only contains the final prompt used. GAS just saves what it gets.
+            try {
+                const response = await fetch('/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        base64Image: base64Image,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to save to history.');
+                }
+                
+                const saveData = await response.json();
+                
+                // Add new item to the top of the history sidebar
+                if (saveData.success && saveData.historyItem) {
+                    const newItemEl = createHistoryItem(saveData.historyItem);
+                    historyContainer.prepend(newItemEl);
+                    lucide.createIcons();
+                    
+                    // Remove "empty" message if it was there
+                    historyEmpty.classList.add('hidden');
+                }
+                
+            } catch (error) {
+                console.error('Save error:', error);
+                // Don't bother the user with a save error, just log it
+            }
+        }
+
+        // --- Event Listeners ---
+        translateBtn.addEventListener('click', handleTranslate);
+        generateBtn.addEventListener('click', handleGenerate);
+        editBtn.addEventListener('click', handleEditToggle);
+
+        // --- Initialisation ---
+        populateStyles();
+        loadHistory();
+        
+    </script>
+</body>
+</html>
