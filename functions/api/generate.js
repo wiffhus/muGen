@@ -52,6 +52,11 @@ export async function onRequest(context) {
         const data = await context.request.json();
         const { action, model, keyIndex } = data;
 
+        // ★ 追加: エラーロギングアクション
+        if (action === 'logError') {
+            return await handleErrorLog(data, context);
+        }
+
         // ★ 変更: アクションとモデルに応じてAPIキーを取得
         const apiKey = getApiKey(context, model, keyIndex);
 
@@ -86,6 +91,17 @@ export async function onRequest(context) {
 
     } catch (error) {
         console.error("Server Error:", error);
+        // ★ 変更: サーバー側での予期せぬエラーもGASに記録
+        try {
+            const data = await context.request.json().catch(() => ({})); // ボディ取得試行
+            await handleErrorLog({
+                prompt: data.prompt || "N/A",
+                model: data.model || "N/A",
+                error: `Server Error: ${error.message}`
+            }, context);
+        } catch (logError) {
+            console.error("Failed to log server error to GAS:", logError);
+        }
         return new Response(JSON.stringify({ error: error.message || 'An unexpected error occurred' }), { status: 500 });
     }
 }
@@ -144,12 +160,9 @@ async function handleGenerate(data, apiKey, context) {
     if (styles && styles.length > 0) {
         enhancedPrompt += `, ${styles.join(', ')} style`;
     }
-    // ★ 削除: アスペクト比はパラメータで渡すため、プロンプトから削除
-    // enhancedPrompt += `, aspect ratio ${aspectRatio}`;
 
     const apiUrl = `${IMAGEN_API_URL_PREDICT}?key=${apiKey}`;
     
-    // Imagen 3.0 'predict' payload
     const payload = {
         instances: {
             prompt: enhancedPrompt
@@ -157,7 +170,6 @@ async function handleGenerate(data, apiKey, context) {
         parameters: {
             "aspectRatio": aspectRatio, // ★ 修正: アスペクト比をパラメータとして設定
             "sampleCount": 1,
-            // Safety/Filter settings
             "safetySettings": {
                 "violence": "BLOCK_NONE",
                 "sexual": "BLOCK_NONE",
@@ -176,6 +188,8 @@ async function handleGenerate(data, apiKey, context) {
     if (!response.ok) {
         const errorText = await response.text();
         console.error("Imagen API Error:", errorText);
+        // ★ 追加: エラーをGASに送信
+        await handleErrorLog({ prompt: enhancedPrompt, model: model, error: `Imagen API Error: ${errorText}` }, context);
         return new Response(JSON.stringify({ error: `Failed to generate image (Imagen): ${errorText}` }), { status: 500 });
     }
 
@@ -189,7 +203,7 @@ async function handleGenerate(data, apiKey, context) {
             prompt: prompt,
             translatedPrompt: enhancedPrompt, 
             base64Data: base64,
-            model: model // ★ 修正: 動的にモデルを渡す
+            model: model 
         };
         context.waitUntil(
             fetch(gasUrl, {
@@ -217,8 +231,6 @@ async function handleEdit(data, apiKey, context) {
     const isEditMode = !!baseImage;
 
     const apiUrl = `${GEMINI_API_URL_FLASH_IMAGE}?key=${apiKey}`;
-
-    // Gemini 2.5 Flash Image payload
     
     // ユーザーが送信するパーツ
     const userParts = [{ text: prompt }];
@@ -241,8 +253,6 @@ async function handleEdit(data, apiKey, context) {
         ],
         generationConfig: {
             responseModalities: ['TEXT', 'IMAGE']
-            // ★ 修正: Gemini 2.5 Flash Image API は generationConfig 内の aspectRatio をサポートしていないため削除
-            // "aspectRatio": aspectRatio 
         },
         safetySettings: [
             { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
@@ -261,6 +271,8 @@ async function handleEdit(data, apiKey, context) {
     if (!response.ok) {
         const errorText = await response.text();
         console.error("Gemini Edit API Error:", errorText);
+        // ★ 追加: エラーをGASに送信
+        await handleErrorLog({ prompt: prompt, model: model, error: `Gemini API Error: ${errorText}` }, context);
         return new Response(JSON.stringify({ error: `Failed to edit image (Gemini): ${errorText}` }), { status: 500 });
     }
 
@@ -270,10 +282,15 @@ async function handleEdit(data, apiKey, context) {
     if (!base64) {
         console.error("Gemini Edit API Error: No image data in response", result);
         const errorText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        let errorMessage;
         if (result?.candidates?.[0]?.finishReason === 'SAFETY') {
-             return new Response(JSON.stringify({ error: `Edit failed: Image blocked due to safety settings.` }), { status: 500 });
+             errorMessage = `Edit failed: Image blocked due to safety settings.`;
+        } else {
+             errorMessage = `Edit failed: ${errorText || 'No image data returned'}`;
         }
-        return new Response(JSON.stringify({ error: `Edit failed: ${errorText || 'No image data returned'}` }), { status: 500 });
+        // ★ 追加: エラーをGASに送信
+        await handleErrorLog({ prompt: prompt, model: model, error: errorMessage }, context);
+        return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
     }
 
     // --- Asynchronously save to GAS ---
@@ -284,7 +301,7 @@ async function handleEdit(data, apiKey, context) {
             prompt: gasPrompt,
             translatedPrompt: gasPrompt,
             base64Data: base64,
-            model: model // ★ 修正: 動的にモデルを渡す
+            model: model 
         };
         context.waitUntil(
             fetch(gasUrl, {
@@ -300,3 +317,37 @@ async function handleEdit(data, apiKey, context) {
         headers: { 'Content-Type': 'application/json' },
     });
 }
+
+/**
+ * ★ 追加: エラーをGASに送信する
+ */
+async function handleErrorLog(data, context) {
+    const { prompt, model, error } = data;
+    const gasUrl = context.env.GAS_WEB_APP_URL;
+
+    if (!gasUrl) {
+        console.warn("GAS_WEB_APP_URL not set. Skipping error logging.");
+        // フロントエンドには成功したように見せかける
+        return new Response(JSON.stringify({ success: true, message: "GAS URL not set" }), { status: 200 });
+    }
+
+    const errorData = {
+        prompt: `[ERROR] ${prompt || 'N/A'}`,
+        translatedPrompt: error, // エラーメッセージをここに
+        base64Data: "ERROR_LOG", // 識別子
+        model: model || 'N/A'
+    };
+
+    try {
+        await fetch(gasUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(errorData)
+        });
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+    } catch (err) {
+        console.error("GAS error log save error:", err);
+        return new Response(JSON.stringify({ error: "Failed to save error log" }), { status: 500 });
+    }
+}
+
