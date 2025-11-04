@@ -240,8 +240,9 @@ async function handleEdit(data, apiKey, context) {
             }
         ],
         generationConfig: {
-            responseModalities: ['TEXT', 'IMAGE'],
-            "aspectRatio": aspectRatio // ★ 修正: アスペクト比を設定
+            responseModalities: ['TEXT', 'IMAGE']
+            // ★ 修正: Gemini 2.5 Flash Image API は generationConfig 内の aspectRatio をサポートしていないため削除
+            // "aspectRatio": aspectRatio 
         },
         safetySettings: [
             { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
@@ -299,4 +300,3 @@ async function handleEdit(data, apiKey, context) {
         headers: { 'Content-Type': 'application/json' },
     });
 }
-
