@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>muGen.</title>
+    <title>muGen - AI Image Generator</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- (Omitted: <style> block for brevity, assumed unchanged) -->
@@ -162,6 +162,12 @@
             100% { transform: translateX(-50%); } 
         }
 
+        /* ★ 変更: トースト/エラー表示 */
+        #toast {
+            max-width: 400px;
+            word-break: break-word;
+        }
+
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 h-screen w-screen overflow-hidden flex">
@@ -216,7 +222,7 @@
     <!-- ★ 変更: サイドバー 初期状態を md:translate-x-0 (PC表示) に -->
     <aside id="sidebar" class="bg-gray-800 h-full w-64 p-4 flex flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-xl font-bold text-white">History</h1>
+            <h1 class="text-xl font-bold text-white">muGen History</h1>
             <!-- ★ 変更: md:hidden (スマホ専用クローズ) -->
             <button id="close-sidebar" class="md:hidden text-gray-400 hover:text-white">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
@@ -255,7 +261,7 @@
             </button>
             <div class="flex items-center space-x-2">
                 <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>
-                <span class="text-lg font-semibold text-white">muGen.</span>
+                <span class="text-lg font-semibold text-white">muGen Image Generator</span>
             </div>
             <div class="flex space-x-2 ml-4">
                 <div class="w-3 h-3 rounded-full bg-gray-700"></div>
@@ -383,7 +389,7 @@
         </footer>
     </main>
 
-    <!-- (Omitted: Image Modal and Toast Notification for brevity) -->
+    <!-- (Omitted: Image Modal for brevity) -->
     <div id="image-modal" class="modal">
         <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col p-4">
             <img id="modal-image" src="" class="max-w-full max-h-[70vh] object-contain mx-auto">
@@ -412,8 +418,19 @@
         </div>
     </div>
 
-    <div id="toast" class="fixed top-20 right-6 bg-green-600 text-white py-2 px-6 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50">
-        <p id="toast-message">Message</p>
+    <!-- ★ 変更: トースト/エラー表示のHTML構造 -->
+    <div id="toast" class="fixed top-20 right-6 text-white py-3 px-4 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50">
+        <div class="flex items-start justify-between">
+            <p id="toast-message" class="flex-1 pr-4">Message</p>
+            <div class="flex flex-col space-y-1">
+                <button id="toast-close" class="text-white hover:text-gray-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
+                </button>
+                <button id="toast-copy" class="hidden text-white hover:text-gray-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-copy"></use></svg>
+                </button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -439,6 +456,8 @@
         // ★ 追加: 生成キャンセル用
         let generationInProgress = false;
         let currentFetchController = null;
+        // ★ 追加: トーストのタイマー
+        let toastTimeoutId = null;
 
 
         // --- DOM ELEMENTS ---
@@ -501,8 +520,11 @@
         // ★ 追加: 編集モードインジケーター
         const editModeIndicator = document.getElementById('edit-mode-indicator');
         
+        // ★ 変更: トースト
         const toast = document.getElementById('toast');
         const toastMessage = document.getElementById('toast-message');
+        const toastClose = document.getElementById('toast-close');
+        const toastCopy = document.getElementById('toast-copy');
 
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -724,6 +746,10 @@
             editButton.addEventListener('click', () => toggleEditMode(true)); 
             closeImageButton.addEventListener('click', closeImage); // ★ 追加
             
+            // ★ 追加: トーストボタン
+            toastClose.addEventListener('click', () => hideToast());
+            toastCopy.addEventListener('click', () => copyToastMessage());
+
             modelSelect.addEventListener('change', () => {
                 // ★ 変更: 編集モード中に Imagen を選んだら編集モード解除
                 if (modelSelect.value === 'imagen-3.0-generate' && isEditingMode) {
@@ -892,7 +918,7 @@
             }
         }
 
-        // ★ 変更: キャンセル機能
+        // ★ 変更: キャンセル機能 + エラー時のGAS送信
         async function handleGenerationSubmit(event) {
             if (event) event.preventDefault(); 
             
@@ -990,6 +1016,9 @@
                     console.log("Fetch aborted by user.");
                 } else {
                     showToast(error.message, "error");
+                    
+                    // ★ 追加: フロントエンドでのエラーもGASに送信
+                    sendErrorToGAS(payload, error.message);
                 }
                 // ★ キャンセル時やエラー時でもプレースホルダーに戻さない (前回の画像が残るようにする)
                 if (!currentEditImageBase64) {
@@ -1043,6 +1072,24 @@
             }
         }
 
+        // ★ 追加: エラーをGASに送信する（サイレント）
+        function sendErrorToGAS(payload, errorMessage) {
+            // エラー送信はバックグラウンドで試行し、失敗してもユーザーには通知しない
+            fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'logError',
+                    prompt: payload.prompt,
+                    model: payload.model,
+                    error: errorMessage
+                })
+            }).catch(err => {
+                console.warn("Failed to log error to GAS:", err);
+            });
+        }
+
+
         // --- ★ 追加: プロンプト入力用ヘルパー ---
 
         function handlePromptCopy() {
@@ -1051,28 +1098,8 @@
                 showToast("Nothing to copy", "info");
                 return;
             }
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                showToast("Prompt copied to clipboard!", "success");
-            }).catch(err => {
-                console.error('Clipboard copy failed:', err);
-                try {
-                    // Fallback for insecure contexts (like http or iframes)
-                    const textArea = document.createElement("textarea");
-                    textArea.value = textToCopy;
-                    textArea.style.position = "fixed"; // Prevent scrolling to bottom
-                    textArea.style.top = "0";
-                    textArea.style.left = "0";
-                    document.body.appendChild(textArea);
-                    textArea.focus();
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                    showToast("Prompt copied to clipboard!", "success");
-                } catch (fallbackErr) {
-                    console.error('Fallback copy failed:', fallbackErr);
-                    showToast("Failed to copy prompt", "error");
-                }
-            });
+            // クリップボードコピー
+            copyToClipboard(textToCopy, "Prompt copied to clipboard!");
         }
 
         function handlePromptClear() {
@@ -1097,27 +1124,7 @@
         // ★ 変更: クリップボードコピーのFallbackを改善
         function handleModalCopy() {
             const textToCopy = modalPrompt.textContent;
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                showToast("Prompt copied to clipboard!", "success");
-            }).catch(err => {
-                console.error('Clipboard copy failed:', err);
-                try {
-                    const textArea = document.createElement("textarea");
-                    textArea.value = textToCopy;
-                    textArea.style.position = "fixed";
-                    textArea.style.top = "0";
-                    textArea.style.left = "0";
-                    document.body.appendChild(textArea);
-                    textArea.focus();
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                    showToast("Prompt copied to clipboard!", "success");
-                } catch (fallbackErr) {
-                    console.error('Fallback copy failed:', fallbackErr);
-                    showToast("Failed to copy prompt", "error");
-                }
-            });
+            copyToClipboard(textToCopy, "Prompt copied to clipboard!");
         }
         
         function handleModalRegenerate() {
@@ -1139,28 +1146,75 @@
             imageModal.classList.remove('flex');
         }
 
+        // ★ 変更: showToast (エラー時は自動で消えない)
         function showToast(message, type = "success") {
-            // ... (変更なし)
+            if (toastTimeoutId) {
+                clearTimeout(toastTimeoutId);
+                toastTimeoutId = null;
+            }
+            
             toastMessage.textContent = message;
-            toast.className = `fixed top-20 right-6 text-white py-2 px-6 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50`; // Reset
+            toast.className = `fixed top-20 right-6 text-white py-3 px-4 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50`; // Reset
             
             if (type === "error") {
                 toast.classList.add('bg-red-600');
-            } else if (type === "warning") {
-                toast.classList.add('bg-yellow-500');
-            } else if (type === "info") { 
-                toast.classList.add('bg-blue-600');
+                toastCopy.classList.remove('hidden'); // エラー時のみコピーボタン表示
             } else {
-                toast.classList.add('bg-green-600');
+                toast.classList.add(type === "warning" ? 'bg-yellow-500' : (type === "info" ? 'bg-blue-600' : 'bg-green-600'));
+                toastCopy.classList.add('hidden');
             }
 
             toast.classList.remove('opacity-0', '-translate-y-10');
             toast.classList.add('opacity-100', 'translate-y-0');
 
-            setTimeout(() => {
-                toast.classList.remove('opacity-100', 'translate-y-0');
-                toast.classList.add('opacity-0', '-translate-y-10');
-            }, 3000); 
+            // ★ エラーでない場合のみ、3秒後に自動で消す
+            if (type !== "error") {
+                toastTimeoutId = setTimeout(() => {
+                    hideToast();
+                }, 3000); 
+            }
+        }
+
+        // ★ 追加: トーストを隠す
+        function hideToast() {
+            if (toastTimeoutId) {
+                clearTimeout(toastTimeoutId);
+                toastTimeoutId = null;
+            }
+            toast.classList.remove('opacity-100', 'translate-y-0');
+            toast.classList.add('opacity-0', '-translate-y-10');
+        }
+        
+        // ★ 追加: トーストメッセージをコピー
+        function copyToastMessage() {
+            const textToCopy = toastMessage.textContent;
+            copyToClipboard(textToCopy, "Error message copied!");
+        }
+
+        // ★ 汎用コピー関数
+        function copyToClipboard(textToCopy, successMessage) {
+             navigator.clipboard.writeText(textToCopy).then(() => {
+                showToast(successMessage, "success");
+            }).catch(err => {
+                console.error('Clipboard copy failed:', err);
+                try {
+                    // Fallback for insecure contexts
+                    const textArea = document.createElement("textarea");
+                    textArea.value = textToCopy;
+                    textArea.style.position = "fixed"; 
+                    textArea.style.top = "0";
+                    textArea.style.left = "0";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showToast(successMessage, "success");
+                } catch (fallbackErr) {
+                    console.error('Fallback copy failed:', fallbackErr);
+                    showToast("Failed to copy", "error");
+                }
+            });
         }
         
         // ★ 変更: アイコン切り替え (isEditingMode 対応)
