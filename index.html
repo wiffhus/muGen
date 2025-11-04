@@ -126,6 +126,42 @@
             border-color: #4f46e5;
             background-color: #1f2937;
         }
+
+        /* ★ 追加: History Marquee */
+        .history-info-container {
+            width: 100%;
+            overflow: hidden;
+            white-space: nowrap;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            background: rgba(0, 0, 0, 0.7);
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none; /* 下の画像をクリックできるように */
+        }
+        .group:hover .history-info-container {
+            opacity: 1;
+        }
+        .history-info-text-wrapper {
+            display: inline-block;
+            white-space: nowrap;
+            /* アニメーションは長めの時間 (25秒) に設定 */
+            animation: marquee 25s linear infinite;
+        }
+        .history-info-text {
+            display: inline-block;
+            padding: 4px 12px; /* 左右にパディング */
+            color: white;
+            font-size: 10px;
+        }
+        
+        @keyframes marquee {
+            0%   { transform: translateX(0); }
+            /* テキスト2回分の半分を動かす */
+            100% { transform: translateX(-50%); } 
+        }
+
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 h-screen w-screen overflow-hidden flex">
@@ -170,6 +206,10 @@
         <!-- ★ 追加: アップロードアイコン -->
         <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-upload">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line>
+        </symbol>
+        <!-- ★ 追加: 入力クリアアイコン (X Circle) -->
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-x-circle">
+            <circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>
         </symbol>
     </svg>
 
@@ -315,7 +355,20 @@
 
                 <!-- ★ 変更: Prompt Input (mt-4追加) -->
                 <div class="relative mt-4">
-                    <textarea id="prompt-input" rows="2" class="block w-full p-4 pr-32 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Enter your prompt... (Non-English will be translated)"></textarea>
+                    <!-- ★ 変更: pr-32 -> pr-48 (ボタン追加のため) -->
+                    <textarea id="prompt-input" rows="2" class="block w-full p-4 pr-48 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Enter your prompt... (Non-English will be translated)"></textarea>
+                    
+                    <!-- ★ 追加: コピー/クリアボタン -->
+                    <div class="absolute bottom-3 right-32 flex space-x-2">
+                         <button id="prompt-copy-button" type="button" class="p-2 bg-gray-600 text-gray-400 rounded-lg hover:bg-gray-500 hover:text-gray-200 transition" data-tooltip="Copy Prompt">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-copy"></use></svg>
+                        </button>
+                         <button id="prompt-clear-button" type="button" class="p-2 bg-gray-600 text-gray-400 rounded-lg hover:bg-gray-500 hover:text-gray-200 transition" data-tooltip="Clear Input">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x-circle"></use></svg>
+                        </button>
+                    </div>
+
+                    <!-- ★ 変更: pr-48 に合わせて right-3 のまま -->
                     <div class="absolute bottom-3 right-3 flex space-x-2">
                         <button id="translate-button" type="button" class="p-2 bg-gray-600 text-gray-300 rounded-lg hover:bg-gray-500 transition" data-tooltip="Translate to English">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-translate"></use></svg>
@@ -399,6 +452,10 @@
         const promptInput = document.getElementById('prompt-input');
         const translateButton = document.getElementById('translate-button');
         const generateButton = document.getElementById('generate-button');
+        // ★ 追加: プロンプトボタン
+        const promptCopyButton = document.getElementById('prompt-copy-button');
+        const promptClearButton = document.getElementById('prompt-clear-button');
+
         const loadingAnimation = document.getElementById('loading-animation');
         const imageDisplay = document.getElementById('image-display');
         const generatedImage = document.getElementById('generated-image');
@@ -472,6 +529,9 @@
                 objectStore.createIndex("prompt", "prompt", { unique: false });
                 // ★ 追加: モデル情報を保存するインデックス
                 objectStore.createIndex("model", "model", { unique: false });
+                // ★ 追加: アスペクト比とスタイル
+                objectStore.createIndex("aspectRatio", "aspectRatio", { unique: false });
+                objectStore.createIndex("styles", "styles", { unique: false });
             };
 
             request.onsuccess = (event) => {
@@ -480,8 +540,8 @@
             };
         }
 
-        // ★ 変更: モデル情報を保存
-        function saveImageToDB(prompt, translatedPrompt, base64Data, model) {
+        // ★ 変更: モデル情報、アスペクト比、スタイルを保存
+        function saveImageToDB(prompt, translatedPrompt, base64Data, model, aspectRatio, styles) {
             if (!db) return;
             const transaction = db.transaction(["images"], "readwrite");
             const objectStore = transaction.objectStore("images");
@@ -490,7 +550,9 @@
                 translatedPrompt: translatedPrompt,
                 base64: base64Data,
                 timestamp: new Date().getTime(),
-                model: model // ★ モデル情報を保存
+                model: model, // ★ モデル情報を保存
+                aspectRatio: aspectRatio, // ★ アスペクト比を保存
+                styles: styles // ★ スタイル(配列)を保存
             };
             const request = objectStore.add(newItem);
 
@@ -507,7 +569,7 @@
             };
         }
 
-        // ★ 変更: 統計情報を計算して表示
+        // ★ 変更: 統計情報を計算して表示 + マーキー情報
         function loadHistory() {
             if (!db) return;
             const transaction = db.transaction(["images"], "readonly");
@@ -527,18 +589,43 @@
                     items.forEach(item => {
                         const div = document.createElement('div');
                         div.className = "cursor-pointer rounded-lg overflow-hidden relative group";
-                        // ★ 変更: History項目に編集ボタンを追加 (モーダルを開くのは共通)
+                        
+                        // ★ 変更: History項目にマーキー情報と編集ボタンを追加
+                        
+                        // 表示する情報テキストを作成
+                        let infoParts = [
+                            `[P] ${item.prompt || ''}`,
+                            `[M] ${item.model || 'unknown'}`,
+                            `[A] ${item.aspectRatio || 'N/A'}`
+                        ];
+                        if (item.styles && item.styles.length > 0) {
+                            infoParts.push(`[S] ${item.styles.join(', ')}`);
+                        }
+                        // テキストを区切り文字で連結 (HTMLエスケープは不要、innerHTMLで解釈される)
+                        const infoText = infoParts.join(' &nbsp;&nbsp;|&nbsp;&nbsp; ');
+
                         div.innerHTML = `
                             <img src="${item.base64}" alt="History thumbnail" class="w-full h-auto object-cover">
-                            <div class="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2">
-                                <p class="text-white text-xs text-center line-clamp-2">${item.prompt}</p>
-                                <button class="mt-2 text-xs bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded" data-base64="${item.base64.split(',')[1]}" data-prompt="${item.prompt}">
+                            
+                            <!-- ★ 変更: ホバー時のオーバーレイ (中央にボタン) -->
+                            <div class="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
+                                <button class="text-xs bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded" data-base64="${item.base64.split(',')[1]}" data-prompt="${item.prompt}">
                                     Edit
                                 </button>
                             </div>
+
+                            <!-- ★ 追加: マーキーコンテナ -->
+                            <div class="history-info-container">
+                                <div class="history-info-text-wrapper">
+                                    <span class="history-info-text">${infoText}</span>
+                                    <span class="history-info-text">${infoText}</span> <!-- テキストを2回繰り返す -->
+                                </div>
+                            </div>
                         `;
-                        // モーダルを開く
+                        
+                        // モーダルを開く (機能3)
                         div.querySelector('img').addEventListener('click', () => showImageInModal(item.base64, item.prompt, item.translatedPrompt, item.base64.split(',')[1]));
+                        
                         // HistoryのEditボタン
                         div.querySelector('button').addEventListener('click', (e) => {
                             e.stopPropagation(); // 親のクリックイベントを発火させない
@@ -624,6 +711,10 @@
         function initListeners() {
             generationForm.addEventListener('submit', handleGenerationSubmit);
             translateButton.addEventListener('click', handleTranslate);
+            
+            // ★ 追加: プロンプトボタンリスナー
+            promptCopyButton.addEventListener('click', handlePromptCopy);
+            promptClearButton.addEventListener('click', handlePromptClear);
             
             modalClose.addEventListener('click', () => imageModal.classList.remove('flex'));
             modalCopy.addEventListener('click', handleModalCopy);
@@ -869,8 +960,8 @@
                     
                     currentEditImageBase64 = data.base64; // Save for editing
                     
-                    // ★ 変更: モデル情報を渡す
-                    saveImageToDB(prompt, data.translatedPrompt || prompt, base64, model); 
+                    // ★ 変更: モデル情報、アスペクト比、スタイルを渡す
+                    saveImageToDB(prompt, data.translatedPrompt || prompt, base64, model, aspectRatioSelect.value, selectedStyles); 
                     showToast(isEditingMode ? "Edit successful" : "Generation successful", "success");
                     editButton.classList.remove('hidden');
                     closeImageButton.classList.remove('hidden'); // ★ 表示
@@ -882,6 +973,11 @@
                          if (model === 'gemini-2.5-flash-image-preview') {
                             toggleEditMode(true);
                          }
+                    }
+
+                    // ★ 追加: 生成成功後、プロンプトをクリア
+                    if (!isEditingMode) { // 編集モードの時はクリアしない
+                        promptInput.value = "";
                     }
                     
                 } else {
@@ -947,7 +1043,45 @@
             }
         }
 
-        // --- (Omitted: MODAL & TOAST functions for brevity) ---
+        // --- ★ 追加: プロンプト入力用ヘルパー ---
+
+        function handlePromptCopy() {
+            const textToCopy = promptInput.value;
+            if (!textToCopy) {
+                showToast("Nothing to copy", "info");
+                return;
+            }
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showToast("Prompt copied to clipboard!", "success");
+            }).catch(err => {
+                console.error('Clipboard copy failed:', err);
+                try {
+                    // Fallback for insecure contexts (like http or iframes)
+                    const textArea = document.createElement("textarea");
+                    textArea.value = textToCopy;
+                    textArea.style.position = "fixed"; // Prevent scrolling to bottom
+                    textArea.style.top = "0";
+                    textArea.style.left = "0";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showToast("Prompt copied to clipboard!", "success");
+                } catch (fallbackErr) {
+                    console.error('Fallback copy failed:', fallbackErr);
+                    showToast("Failed to copy prompt", "error");
+                }
+            });
+        }
+
+        function handlePromptClear() {
+            promptInput.value = "";
+            showToast("Input cleared", "info");
+        }
+
+
+        // --- MODAL & TOAST functions ---
         
         // ★ 変更: base64 (raw) もデータセットに保存
         function showImageInModal(base64DataUrl, prompt, translatedPrompt, rawBase64) {
@@ -960,8 +1094,8 @@
             imageModal.classList.add('flex');
         }
         
+        // ★ 変更: クリップボードコピーのFallbackを改善
         function handleModalCopy() {
-            // ... (変更なし)
             const textToCopy = modalPrompt.textContent;
             navigator.clipboard.writeText(textToCopy).then(() => {
                 showToast("Prompt copied to clipboard!", "success");
@@ -970,6 +1104,9 @@
                 try {
                     const textArea = document.createElement("textarea");
                     textArea.value = textToCopy;
+                    textArea.style.position = "fixed";
+                    textArea.style.top = "0";
+                    textArea.style.left = "0";
                     document.body.appendChild(textArea);
                     textArea.focus();
                     textArea.select();
@@ -1138,3 +1275,4 @@
     </script>
 </body>
 </html>
+
