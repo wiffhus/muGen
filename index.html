@@ -732,7 +732,8 @@
                 optionsToolbar.style.display = 'flex'; // ツールバー自体は表示
                 modelSelectGroup.style.display = 'none'; // モデル選択は隠す
                 autoRetryGroup.style.display = 'none'; // リトライも隠す
-                aspectRatioGroup.style.display = 'block'; // アスペクト比は表示
+                // ★ 修正: Gemini編集モードではアスペクト比は非表示 (APIがサポートしていないため)
+                aspectRatioGroup.style.display = 'none'; 
                 
                 imageDisplay.classList.add('ring-4', 'ring-indigo-500');
                 if (!stylesContainer.classList.contains('hidden')) {
@@ -845,7 +846,7 @@
                 prompt: prompt,
                 model: model, 
                 keyIndex: apiKeyCounter, 
-                aspectRatio: aspectRatioSelect.value,
+                aspectRatio: aspectRatioSelect.value, // ★ 編集モードでも送信するが、サーバー側 (generate.js) で無視される
                 styles: selectedStyles,
                 baseImage: isEditingMode ? currentEditImageBase64 : null
             };
@@ -1137,4 +1138,3 @@
     </script>
 </body>
 </html>
-
