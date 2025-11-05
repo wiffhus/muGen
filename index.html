@@ -895,10 +895,11 @@
                 if (modelSelect.value === 'imagen-3.0-generate' && isEditingMode) {
                     toggleEditMode(false);
                 }
-                // ★ 変更: Gemini を選んだら（画像があれば）編集モード移行
-                if (modelSelect.value === 'gemini-2.5-flash-image-preview' && currentEditImageBase64) {
-                    toggleEditMode(true);
-                }
+                
+                // ★ 変更(6): Gemini を選んでも自動で編集モードに移行しない
+                // if (modelSelect.value === 'gemini-2.5-flash-image-preview' && currentEditImageBase64) {
+                //     toggleEditMode(true);
+                // }
             });
             
             autoRetrySelect.addEventListener('change', () => {
@@ -1207,14 +1208,12 @@
                     editButton.classList.remove('hidden');
                     closeImageButton.classList.remove('hidden'); // ★ 表示
                     
-                    // ★ 変更: 編集成功後、自動で編集モードを継続
-                    if (!isEditingMode) {
-                         // もし（アップロードなどで）編集モードになっていなかったら、
-                         // 編集可能なモデルで生成した場合は編集モードに入る
-                         if (model === 'gemini-2.5-flash-image-preview') {
-                            toggleEditMode(true);
-                         }
-                    }
+                    // ★ 変更(6): 新規生成 ( !isEditingMode ) の場合、自動で編集モードに移行しない
+                    // if (!isEditingMode) {
+                    //      if (model === 'gemini-2.5-flash-image-preview') {
+                    //         toggleEditMode(true);
+                    //      }
+                    // }
 
                     // ★ 追加: 生成成功後、プロンプトをクリア
                     if (!isEditingMode) { // 編集モードの時はクリアしない
