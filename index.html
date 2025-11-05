@@ -2,9 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <!-- ★ 変更(③): ビューポート設定を微調整 (SafariのUI問題を緩和するため) -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>muGen.</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>muGen - AI Image Generator</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- (Omitted: <style> block for brevity, assumed unchanged) -->
@@ -14,25 +13,8 @@
         
         body {
             font-family: 'Inter', sans-serif;
-            /* ★ 変更(③): overscroll-behavior は維持しつつ、h-screen は解除 */
             overscroll-behavior: none;
         }
-
-        /* ★ 追加(③): スマホでのスクロールと固定フッターのための調整 */
-        @media (max-width: 767px) {
-            /* bodyの高さをブラウザUI込みの高さ(Dynamic Viewport Height)に合わせる試み */
-            body {
-                min-height: 100vh;
-                min-height: 100dvh; /* Dynamic viewport height */
-            }
-            /* ★ 修正2: スマホでの main の padding-bottom は JS で制御 */
-            /*
-            main {
-                padding-bottom: 16rem; 
-            }
-            */
-        }
-
 
         /* Custom scrollbar for sidebar */
         .sidebar-scroll::-webkit-scrollbar {
@@ -188,12 +170,10 @@
 
     </style>
 </head>
-<!-- ★ 変更(③): h-screen, overflow-hidden を削除し、min-h-screen に変更 -->
-<body class="bg-gray-900 text-gray-100 min-h-screen flex">
+<body class="bg-gray-900 text-gray-100 h-screen w-screen overflow-hidden flex">
 
     <!-- (Omitted: Inline SVG Icons Definition for brevity) -->
     <svg width="0" height="0" class="hidden">
-        <!-- (Omitted: All <symbol> definitions...) -->
         <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-menu">
             <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
         </symbol>
@@ -237,16 +217,12 @@
         <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-x-circle">
             <circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>
         </symbol>
-        <!-- ★ 追加(①): パスワード/ロック解除アイコン -->
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-unlock">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
-        </symbol>
     </svg>
 
-    <!-- ★ 変更: サイドバー (PC表示でもスワイプなどで閉じられるように `md:translate-x-0` はJSで制御) -->
+    <!-- ★ 変更: サイドバー 初期状態を md:translate-x-0 (PC表示) に -->
     <aside id="sidebar" class="bg-gray-800 h-full w-64 p-4 flex flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-xl font-bold text-white">History</h1>
+            <h1 class="text-xl font-bold text-white">muGen History</h1>
             <!-- ★ 変更: md:hidden (スマホ専用クローズ) -->
             <button id="close-sidebar" class="md:hidden text-gray-400 hover:text-white">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
@@ -275,8 +251,8 @@
         </div>
     </aside>
 
-    <!-- ★ 修正2: PCでの overflow-hidden を解除し、h-screen を維持 -->
-    <main id="main-content" class="flex-1 flex flex-col transition-all duration-300 ease-in-out md:ml-64 overflow-y-auto md:overflow-y-visible md:h-screen">
+    <!-- ★ 変更: main-content 初期状態を md:ml-64 (PCマージンあり) に -->
+    <main id="main-content" class="flex-1 h-full flex flex-col transition-all duration-300 ease-in-out md:ml-64">
         
         <header class="flex-shrink-0 bg-gray-900/70 backdrop-blur-sm h-16 flex items-center px-6 shadow-md z-20">
             <!-- ★ 変更: md:hidden を削除し、トグルボタンに -->
@@ -285,7 +261,7 @@
             </button>
             <div class="flex items-center space-x-2">
                 <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>
-                <span class="text-lg font-semibold text-white">muGen..</span>
+                <span class="text-lg font-semibold text-white">muGen Image Generator</span>
             </div>
             <div class="flex space-x-2 ml-4">
                 <div class="w-3 h-3 rounded-full bg-gray-700"></div>
@@ -294,10 +270,9 @@
             </div>
         </header>
 
-        <!-- ★ 修正2: ID追加、PCで overflow-y-auto を追加 -->
-        <div id="image-container-parent" class="flex-1 flex items-center justify-center p-4 md:p-8 relative md:overflow-y-auto">
-            <!-- ★ 修正2: h-full を削除, max-h-[70vh] -> max-h-full に変更 -->
-            <div id="image-display" class="w-full max-w-3xl max-h-full flex items-center justify-center bg-gray-800 rounded-lg shadow-inner relative border-2 border-transparent transition-all">
+        <div class="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-hidden">
+            <!-- ★ 変更: ドラッグ＆ドロップとファイル入力対応 -->
+            <div id="image-display" class="w-full h-full max-w-3xl max-h-[70vh] flex items-center justify-center bg-gray-800 rounded-lg shadow-inner relative border-2 border-transparent transition-all">
                 <img id="generated-image" src="" alt="Generated Image" class="hidden max-w-full max-h-full object-contain rounded-lg">
                 <!-- ★ 変更: アップロード機能追加 -->
                 <div id="placeholder" class="text-gray-500 flex flex-col items-center justify-center p-8 text-center">
@@ -328,10 +303,8 @@
             </div>
         </div>
 
-        <!-- ★ 修正2: ID追加, md:relative, md:z-10, md:left-64 を削除 (JSで制御) -->
-        <footer id="footer-controls" class="flex-shrink-0 p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm 
-                       fixed bottom-0 left-0 right-0 z-20 
-                       transition-all duration-300 ease-in-out">
+        <!-- Prompt Input Area -->
+        <footer class="flex-shrink-0 p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm z-10">
             <form id="generation-form" class="max-w-4xl mx-auto">
                 <!-- Options Toolbar -->
                 <!-- ★ 変更: ツールバー自体は常に flex -->
@@ -460,27 +433,6 @@
         </div>
     </div>
 
-    <!-- ★ 追加(①): パスワードモーダル -->
-    <div id="password-modal" class="modal flex"> <!-- 初期表示を 'flex' に変更 -->
-        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
-            <form id="password-form">
-                <h2 class="text-lg font-semibold text-white mb-4">Authentication Required</h2>
-                <p class="text-sm text-gray-300 mb-4">Please enter the password to use muGen.</p>
-                <div class="relative">
-                    <input type="password" id="password-input" class="block w-full p-3 pr-10 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Password...">
-                    <div class="absolute inset-y-0 right-0 flex items-center pr-3">
-                         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-unlock"></use></svg>
-                    </div>
-                </div>
-                <p id="password-error" class="text-red-400 text-sm mt-2 h-5"></p> <!-- エラー表示領域 -->
-                <button type="submit" id="password-submit-button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg transition mt-4">
-                    Unlock
-                </button>
-            </form>
-        </div>
-    </div>
-
-
     <script>
         // --- CONSTANTS & STATE ---
         const STYLES = [
@@ -506,11 +458,6 @@
         let currentFetchController = null;
         // ★ 追加: トーストのタイマー
         let toastTimeoutId = null;
-        
-        // ★ 追加(②): スワイプ検出用
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let isSidebarOpen = true; // ★ サイドバーの状態を追跡 (初期状態はPCでtrue)
 
 
         // --- DOM ELEMENTS ---
@@ -578,84 +525,15 @@
         const toastMessage = document.getElementById('toast-message');
         const toastClose = document.getElementById('toast-close');
         const toastCopy = document.getElementById('toast-copy');
-        
-        // ★ 追加(①): パスワードモーダル要素
-        const passwordModal = document.getElementById('password-modal');
-        const passwordForm = document.getElementById('password-form');
-        const passwordInput = document.getElementById('password-input');
-        const passwordSubmitButton = document.getElementById('password-submit-button');
-        const passwordError = document.getElementById('password-error');
-
-        // ★ 追加(修正2): フッター
-        const footerControls = document.getElementById('footer-controls');
-
 
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
-            // ★ 変更(①): DB初期化より先にパスワードチェック
-            checkPassword(); 
-            
             initDB();
-            initSidebar(); // ★ 修正2: initLayoutより先に実行
-            initLayout(); // ★ 修正2: 追加
+            initSidebar();
             initStyles();
             initListeners();
             loadHistory();
         });
-
-        // --- ★ 追加(①): Password Check ---
-        function checkPassword() {
-            // sessionStorage を使い、タブ/ウィンドウを閉じたら再認証
-            const isAuthed = sessionStorage.getItem('muGenAuthed') === 'true';
-
-            if (isAuthed) {
-                passwordModal.classList.remove('flex');
-                passwordModal.classList.add('hidden');
-            } else {
-                passwordModal.classList.remove('hidden');
-                passwordModal.classList.add('flex');
-                passwordInput.focus();
-            }
-        }
-        
-        async function handlePasswordSubmit(event) {
-            event.preventDefault();
-            const password = passwordInput.value;
-            if (!password) {
-                passwordError.textContent = "Password cannot be empty.";
-                return;
-            }
-
-            passwordError.textContent = "";
-            passwordSubmitButton.disabled = true;
-            passwordSubmitButton.textContent = "Verifying...";
-            
-            try {
-                const response = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'verifyPassword',
-                        password: password
-                    })
-                });
-
-                if (response.ok) {
-                    sessionStorage.setItem('muGenAuthed', 'true');
-                    passwordModal.classList.remove('flex');
-                    passwordModal.classList.add('hidden');
-                } else {
-                    const data = await response.json();
-                    throw new Error(data.error || "Verification failed");
-                }
-            } catch (error) {
-                 console.error("Password verification error:", error);
-                 passwordError.textContent = "Invalid password. Please try again.";
-            } finally {
-                passwordSubmitButton.disabled = false;
-                passwordSubmitButton.textContent = "Unlock";
-            }
-        }
 
         // --- (Omitted: IndexedDB functions for brevity) ---
         function initDB() {
@@ -811,88 +689,30 @@
 
         // --- UI INITIALIZATION ---
 
-        // ★ 変更(②): サイドバートグルロジック (PC/スマホ共通)
+        // ★ 変更: サイドバートグルロジック (PC/スマホ共通)
         function initSidebar() {
-            // PCでの初期状態を設定
-            if (window.innerWidth >= 768) { // md breakpoint
-                sidebar.classList.remove('-translate-x-full');
-                sidebar.classList.add('md:translate-x-0');
-                mainContent.classList.add('md:ml-64');
-                isSidebarOpen = true;
-            } else {
-                sidebar.classList.add('-translate-x-full');
-                sidebar.classList.remove('md:translate-x-0');
-                mainContent.classList.remove('md:ml-64');
-                isSidebarOpen = false;
-            }
-            
-            // ★ 修正2: adjustFooterMargin を初期化時に呼び出し
-            adjustFooterMargin();
+            sidebarToggleButton.addEventListener('click', () => {
+                // サイドバーが開いているか (translate-x-full が *ない* か)
+                const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
 
-            sidebarToggleButton.addEventListener('click', toggleSidebar);
+                if (isSidebarOpen) {
+                    // 閉じる
+                    sidebar.classList.add('-translate-x-full');
+                    sidebar.classList.remove('md:translate-x-0'); // PC用の表示クラスも削除
+                    mainContent.classList.remove('md:ml-64'); // PC用のマージン削除
+                } else {
+                    // 開く
+                    sidebar.classList.remove('-translate-x-full');
+                    sidebar.classList.add('md:translate-x-0'); // PC用の表示クラス追加
+                    mainContent.classList.add('md:ml-64'); // PC用のマージン追加
+                }
+            });
             
             // スマホ用クローズボタン (変更なし)
-            closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
-        }
-        
-        // ★ 追加(②): サイドバーの開閉を制御する関数
-        function toggleSidebar(forceOpen) {
-            // forceOpen が boolean の場合はその状態に設定、未定義の場合はトグル
-            const shouldBeOpen = (typeof forceOpen === 'boolean') ? forceOpen : !isSidebarOpen;
-            
-            if (shouldBeOpen) {
-                // 開く
-                sidebar.classList.remove('-translate-x-full');
-                if (window.innerWidth >= 768) {
-                    sidebar.classList.add('md:translate-x-0'); 
-                    mainContent.classList.add('md:ml-64');
-                }
-                isSidebarOpen = true;
-            } else {
-                // 閉じる
+            closeSidebarBtn.addEventListener('click', () => {
                 sidebar.classList.add('-translate-x-full');
-                if (window.innerWidth >= 768) {
-                    sidebar.classList.remove('md:translate-x-0');
-                    mainContent.classList.remove('md:ml-64');
-                }
-                isSidebarOpen = false;
-            }
-            
-            // ★ 追加(修正2): フッターマージンを調整
-            adjustFooterMargin();
-            // ★ 追加(修正2): レイアウト再計算
-            setTimeout(initLayout, 300); // transition 完了後
+            });
         }
-
-        // ★ 追加(修正2): レイアウト調整
-        function initLayout() {
-            if (!footerControls) return;
-            // フッターの高さを取得
-            const footerHeight = footerControls.offsetHeight;
-            
-            // main に padding-bottom を設定 (スマホ・PC共通)
-            if (window.innerWidth >= 768) {
-                // PC (p-8 = 32px相当のマージン)
-                mainContent.style.paddingBottom = `${footerHeight + 32}px`;
-            } else {
-                // スマホ (p-4 = 16px相当のマージン)
-                mainContent.style.paddingBottom = `${footerHeight + 16}px`;
-            }
-            
-            // サイドバーの状態に応じてフッターの左マージンを調整
-            adjustFooterMargin();
-        }
-
-        // ★ 追加(修正2): フッターマージン調整
-        function adjustFooterMargin() {
-            if (!footerControls) return;
-            if (window.innerWidth >= 768 && isSidebarOpen) { // PC かつ サイドバーが開いている
-                footerControls.classList.add('md:left-64');
-            } else { // スマホ or サイドバーが閉じている
-                footerControls.classList.remove('md:left-64');
-            }
-        }
-
 
         function initStyles() {
             const container = document.getElementById('styles-container');
@@ -911,14 +731,8 @@
 
         // --- EVENT LISTENERS ---
         function initListeners() {
-            // ★ 追加(①): パスワードフォーム
-            passwordForm.addEventListener('submit', handlePasswordSubmit);
-            
             generationForm.addEventListener('submit', handleGenerationSubmit);
             translateButton.addEventListener('click', handleTranslate);
-
-            // ★ 追加(修正2): リサイズ
-            window.addEventListener('resize', initLayout); 
             
             // ★ 追加: プロンプトボタンリスナー
             promptCopyButton.addEventListener('click', handlePromptCopy);
@@ -941,11 +755,10 @@
                 if (modelSelect.value === 'imagen-3.0-generate' && isEditingMode) {
                     toggleEditMode(false);
                 }
-                
-                // ★ 変更(6): Gemini を選んでも自動で編集モードに移行しない
-                // if (modelSelect.value === 'gemini-2.5-flash-image-preview' && currentEditImageBase64) {
-                //     toggleEditMode(true);
-                // }
+                // ★ 変更: Gemini を選んだら（画像があれば）編集モード移行
+                if (modelSelect.value === 'gemini-2.5-flash-image-preview' && currentEditImageBase64) {
+                    toggleEditMode(true);
+                }
             });
             
             autoRetrySelect.addEventListener('change', () => {
@@ -972,59 +785,8 @@
             // ★ 追加: ファイルアップロードリスナー
             uploadImageButton.addEventListener('click', () => uploadImageInput.click());
             uploadImageInput.addEventListener('change', handleFileSelect);
-
-            // ★ 追加(②): スワイプイベントリスナー
-            document.body.addEventListener('touchstart', handleTouchStart, { passive: true });
-            document.body.addEventListener('touchmove', handleTouchMove, { passive: false }); // スクロールを防ぐ可能性があるため false
         }
         
-        // --- ★ 追加(②): Touch Handlers for Swipe ---
-        function handleTouchStart(e) {
-            // パスワードモーダル表示中はスワイプ無効
-            if (passwordModal.classList.contains('flex')) return;
-            
-            const touch = e.touches[0];
-            touchStartX = touch.clientX;
-            touchStartY = touch.clientY;
-        }
-
-        function handleTouchMove(e) {
-            if (!touchStartX || !touchStartY) {
-                return;
-            }
-            
-            // パスワードモーダル表示中はスワイプ無効
-            if (passwordModal.classList.contains('flex')) return;
-
-            const touch = e.touches[0];
-            const diffX = touch.clientX - touchStartX;
-            const diffY = touch.clientY - touchStartY;
-
-            // 横方向のスワイプを優先
-            if (Math.abs(diffX) > Math.abs(diffY)) {
-                
-                // 画面左端 (50px) から右へのスワイプ (70px以上) で開く
-                if (!isSidebarOpen && touchStartX < 50 && diffX > 70) {
-                    e.preventDefault(); // 画面のスクロールを止める
-                    toggleSidebar(true);
-                    // Reset
-                    touchStartX = 0;
-                    touchStartY = 0;
-                }
-                
-                // 画面右端から左へのスワイプ (70px以上) で閉じる
-                // (main-content領域でのスワイプ)
-                if (isSidebarOpen && diffX < -70 && touchStartX > sidebar.offsetWidth) {
-                    e.preventDefault();
-                    toggleSidebar(false);
-                    // Reset
-                    touchStartX = 0;
-                    touchStartY = 0;
-                }
-            }
-        }
-
-
         // --- CORE LOGIC ---
 
         function toggleStylesAccordion() {
@@ -1034,12 +796,7 @@
 
         function handlePromptKeydown(event) {
             if (isMobile) {
-                // ★ 変更(③): モバイルでも Enter で送信 (Shift+Enterで改行)
-                if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    handleGenerationSubmit(new Event('submit'));
-                }
-                return;
+                return; // モバイルでは無効
             }
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault(); 
@@ -1075,7 +832,7 @@
             }
         }
 
-        // ★ 変更(⑤): 編集モードインジケーター制御 + ツールバー制御 (リトライを許可)
+        // ★ 変更: 編集モードインジケーター制御 + ツールバー制御
         function toggleEditMode(forceOn) { 
             isEditingMode = forceOn;
             
@@ -1091,13 +848,9 @@
                 // ★ 変更: ツールバーの項目を個別に制御
                 optionsToolbar.style.display = 'flex'; // ツールバー自体は表示
                 modelSelectGroup.style.display = 'none'; // モデル選択は隠す
-                
-                // ★ 変更(⑤): 編集モードでもリトライを表示
-                autoRetryGroup.style.display = 'block'; 
-                
+                autoRetryGroup.style.display = 'none'; // リトライも隠す
                 // ★ 修正: Gemini編集モードではアスペクト比は非表示 (APIがサポートしていないため)
-                // ★ ただし、依頼(④)でアスペクト比対応するので、表示したままにする
-                aspectRatioGroup.style.display = 'block'; 
+                aspectRatioGroup.style.display = 'none'; 
                 
                 imageDisplay.classList.add('ring-4', 'ring-indigo-500');
                 if (!stylesContainer.classList.contains('hidden')) {
@@ -1165,28 +918,10 @@
             }
         }
 
-        // ★ 変更(④): キャンセル機能 + エラー時のGAS送信 + アスペクト比対応
-        // ★ 変更(修正1): isEditingMode の状態を送信前に再評価
+        // ★ 変更: キャンセル機能 + エラー時のGAS送信
         async function handleGenerationSubmit(event) {
             if (event) event.preventDefault(); 
             
-            // ★ 修正１: isEditingMode の状態を「モデル選択」と「画像有無」に基づいて決定する
-            const model = modelSelect.value;
-            
-            if (model === 'gemini-2.5-flash-image-preview' && currentEditImageBase64) {
-                // Gemini かつ 画像あり の場合のみ編集モード
-                if (!isEditingMode) {
-                    toggleEditMode(true); // UIを同期させる
-                }
-                isEditingMode = true;
-            } else {
-                // それ以外 (Imagen or 画像なし)
-                if (isEditingMode) {
-                    toggleEditMode(false); // UIを同期させる
-                }
-                isEditingMode = false;
-            }
-
             // ★ キャンセルロジック
             if (generationInProgress) {
                 if (currentFetchController) {
@@ -1203,7 +938,7 @@
                 return;
             }
 
-            // ★ 編集モードでベース画像がない場合のエラー (上記ロジックにより、ここは通らないはず)
+            // ★ 編集モードでベース画像がない場合のエラー
             if (isEditingMode && !currentEditImageBase64) {
                  showToast("No image loaded for editing. Please upload or generate an image.", "warning");
                  toggleEditMode(false); // 編集モードを解除
@@ -1220,21 +955,17 @@
             closeImageButton.classList.add('hidden'); // ★ 生成中は非表示
 
             const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value);
-            // const model = modelSelect.value; // ★ 修正1: 上で定義済み
-            const aspectRatio = aspectRatioSelect.value; // ★ 取得
+            const model = modelSelect.value; 
             apiKeyCounter++; 
             
-            // ★ 変更(④): Imagenの場合はアスペクト比を渡すが、Geminiの場合は渡さない (フロントで処理するため)
-            const apiAspectRatio = (model === 'imagen-3.0-generate') ? aspectRatio : '1:1';
-
             const payload = {
-                action: isEditingMode ? 'edit' : 'generate', // ★ 修正1: 上で確定済み
+                action: isEditingMode ? 'edit' : 'generate',
                 prompt: prompt,
                 model: model, 
                 keyIndex: apiKeyCounter, 
-                aspectRatio: apiAspectRatio, // ★ Imagen用のアスペクト比
+                aspectRatio: aspectRatioSelect.value, // ★ 編集モードでも送信するが、サーバー側 (generate.js) で無視される
                 styles: selectedStyles,
-                baseImage: isEditingMode ? currentEditImageBase64 : null // ★ 修正1: 上で確定済み
+                baseImage: isEditingMode ? currentEditImageBase64 : null
             };
 
             const retryCount = parseInt(autoRetrySelect.value, 10);
@@ -1250,36 +981,25 @@
 
                 if (response.ok) {
                     const base64 = `data:image/png;base64,${data.base64}`;
-                    
-                    // --- ★ 追加(④): アスペクト比パディング処理 ---
-                    let finalBase64 = base64;
-                    if ((model === 'gemini-2.5-flash-image-preview') && aspectRatio !== '1:1') {
-                        showToast("Applying aspect ratio padding...", "info");
-                        finalBase64 = await applyAspectRatioPadding(base64, aspectRatio);
-                    }
-                    // ------------------------------------------
-
-                    generatedImage.src = finalBase64;
+                    generatedImage.src = base64;
                     generatedImage.classList.remove('hidden');
                     
-                    // ★ 変更(④): パディング後の画像を保存
-                    currentEditImageBase64 = finalBase64.split(',')[1];
+                    currentEditImageBase64 = data.base64; // Save for editing
                     
-                    // ★ 変更: モデル情報、アスペクト比(選択値)、スタイルを渡す
-                    saveImageToDB(prompt, data.translatedPrompt || prompt, finalBase64, model, aspectRatio, selectedStyles); 
-                    
+                    // ★ 変更: モデル情報、アスペクト比、スタイルを渡す
+                    saveImageToDB(prompt, data.translatedPrompt || prompt, base64, model, aspectRatioSelect.value, selectedStyles); 
                     showToast(isEditingMode ? "Edit successful" : "Generation successful", "success");
                     editButton.classList.remove('hidden');
                     closeImageButton.classList.remove('hidden'); // ★ 表示
                     
-                    // ★ 変更(6): 新規生成 ( !isEditingMode ) の場合、自動で編集モードに移行しない
-                    // (★ 修正1: isEditingMode の決定ロジックが変更されたため、このコメントはもはや不要だが、
-                    //    意図した動作 (Gemini通常生成後に自動で編集モードにならない) は維持される)
-                    // if (!isEditingMode) {
-                    //      if (model === 'gemini-2.5-flash-image-preview') {
-                    //         toggleEditMode(true);
-                    //      }
-                    // }
+                    // ★ 変更: 編集成功後、自動で編集モードを継続
+                    if (!isEditingMode) {
+                         // もし（アップロードなどで）編集モードになっていなかったら、
+                         // 編集可能なモデルで生成した場合は編集モードに入る
+                         if (model === 'gemini-2.5-flash-image-preview') {
+                            toggleEditMode(true);
+                         }
+                    }
 
                     // ★ 追加: 生成成功後、プロンプトをクリア
                     if (!isEditingMode) { // 編集モードの時はクリアしない
@@ -1318,17 +1038,6 @@
         
         // ★ 変更: AbortSignal を引数に追加
         async function fetchWithRetry(url, options, retries = 0, signal = null) {
-            // ★ 追加(①): パスワード未認証ならフェッチしない
-            if (sessionStorage.getItem('muGenAuthed') !== 'true' && options.body) {
-                const bodyData = JSON.parse(options.body);
-                // パスワード検証自体は許可
-                if (bodyData.action !== 'verifyPassword') {
-                    showToast("Not authenticated. Please enter password.", "error");
-                    checkPassword(); // モーダルを再表示
-                    throw new Error("Not authenticated");
-                }
-            }
-
             let attempt = 0;
             const maxRetries = retries < 0 ? 0 : retries; 
 
@@ -1343,14 +1052,6 @@
                         showToast(`Retrying... (Attempt ${attempt} of ${maxRetries})`, "warning");
                     }
                     const response = await fetch(url, options);
-                    
-                    // ★ 401 Unauthorized (パスワードエラーなど) はリトライしない
-                    if (response.status === 401) {
-                         sessionStorage.removeItem('muGenAuthed');
-                         checkPassword(); // パスワードモーダル表示
-                         throw new Error("Authentication failed. Please re-enter password.");
-                    }
-                    
                     if (!response.ok) {
                         const errorData = await response.json().catch(() => ({ error: `Server error: ${response.status}` }));
                         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
@@ -1385,68 +1086,6 @@
                 })
             }).catch(err => {
                 console.warn("Failed to log error to GAS:", err);
-            });
-        }
-
-        // --- ★ 追加(④): Aspect Ratio Padding ---
-        /**
-         * 画像に指定のアスペクト比になるよう余白を追加する
-         * @param {string} base64DataUrl - 元画像の Data URL
-         * @param {string} aspectRatio - "16:9", "9:16" など
-         * @returns {Promise<string>} - 余白が追加された画像の Data URL
-         */
-        function applyAspectRatioPadding(base64DataUrl, aspectRatio) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => {
-                    const [ratioW, ratioH] = aspectRatio.split(':').map(Number);
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-
-                    let srcW = img.width;
-                    let srcH = img.height;
-
-                    // Gemini Flash Image は正方形を返すと仮定 (例: 1024x1024)
-                    // ターゲットのサイズを決定 (元画像の高さを基準にするか、幅を基準にするか)
-                    
-                    let canvasW, canvasH;
-                    let drawX, drawY, drawW, drawH;
-
-                    if (ratioW > ratioH) { // Landscape (例: 16:9)
-                        // 元画像(正方形)の高さをキャンバスの高さに合わせる
-                        canvasH = srcH;
-                        canvasW = srcH * (ratioW / ratioH);
-                        drawW = srcW;
-                        drawH = srcH;
-                        drawX = (canvasW - srcW) / 2; // 中央に配置
-                        drawY = 0;
-                    } else { // Portrait (例: 9:16)
-                        // 元画像(正方形)の幅をキャンバスの幅に合わせる
-                        canvasW = srcW;
-                        canvasH = srcW * (ratioH / ratioW);
-                        drawW = srcW;
-                        drawH = srcH;
-                        drawX = 0;
-                        drawY = (canvasH - srcH) / 2; // 中央に配置
-                    }
-                    
-                    canvas.width = canvasW;
-                    canvas.height = canvasH;
-
-                    // 背景をアプリの背景色で塗りつぶし
-                    ctx.fillStyle = '#111827'; // bg-gray-900 (Tailwind)
-                    ctx.fillRect(0, 0, canvasW, canvasH);
-
-                    // 画像を中央に描画
-                    ctx.drawImage(img, drawX, drawY, drawW, drawH);
-
-                    resolve(canvas.toDataURL('image/png'));
-                };
-                img.onerror = (err) => {
-                    console.error("Failed to load image for padding:", err);
-                    reject(new Error("Failed to load image for padding"));
-                };
-                img.src = base64DataUrl;
             });
         }
 
@@ -1666,7 +1305,6 @@
          * @param {string} [prompt] (Historyから読み込む場合の既存プロンプト)
          */
         function loadUploadedImage(base64DataUrl, prompt = "") {
-            // ★ 変更(④): パディング処理は生成時に行うため、ここでは元画像をそのまま読み込む
             generatedImage.src = base64DataUrl;
             generatedImage.classList.remove('hidden');
             placeholder.style.display = 'none';
