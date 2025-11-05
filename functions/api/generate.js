@@ -52,17 +52,12 @@ export async function onRequest(context) {
         const data = await context.request.json();
         const { action, model, keyIndex } = data;
 
-        // ★ 追加(①): パスワード検証 (APIキー不要)
-        if (action === 'verifyPassword') {
-            return await handleVerifyPassword(data, context);
-        }
-
-        // ★ 追加: エラーロギングアクション (APIキー不要)
+        // ★ 追加: エラーロギングアクション
         if (action === 'logError') {
             return await handleErrorLog(data, context);
         }
 
-        // ★ 変更: アクションとモデルに応じてAPIキーを取得 (上記以外のアクション)
+        // ★ 変更: アクションとモデルに応じてAPIキーを取得
         const apiKey = getApiKey(context, model, keyIndex);
 
         let response;
@@ -77,8 +72,7 @@ export async function onRequest(context) {
                     response = await handleGenerate(data, apiKey, context);
                 } else if (model === 'gemini-2.5-flash-image-preview') {
                     // Gemini Flash Image も 'generate' アクションとして扱われる (編集モードでない場合)
-                    // ★ 変更(④): handleEdit はアスペクト比を無視するため、そのまま流用
-                    response = await handleEdit(data, apiKey, context); 
+                    response = await handleEdit(data, apiKey, context); // 編集用関数を流用
                 } else {
                     response = new Response(JSON.stringify({ error: 'Invalid model for generation' }), { status: 400 });
                 }
@@ -99,14 +93,7 @@ export async function onRequest(context) {
         console.error("Server Error:", error);
         // ★ 変更: サーバー側での予期せぬエラーもGASに記録
         try {
-            // エラー発生時はリクエストボディが消費されている可能性があるので、再取得を試みる
-            let data = {};
-            try {
-                 data = await context.request.json();
-            } catch (e) {
-                 // ボディが取得できない場合は空のまま
-            }
-            
+            const data = await context.request.json().catch(() => ({})); // ボディ取得試行
             await handleErrorLog({
                 prompt: data.prompt || "N/A",
                 model: data.model || "N/A",
@@ -120,27 +107,6 @@ export async function onRequest(context) {
 }
 
 // --- Action Handlers ---
-
-/**
- * ★ 追加(①): パスワードを検証する
- */
-async function handleVerifyPassword(data, context) {
-    const { password } = data;
-    // Cloudflareの環境変数 'MUGEN_PASSWORD' からパスワードを取得
-    const correctPassword = context.env.MUGEN_PASSWORD; 
-
-    if (!correctPassword) {
-        console.error("MUGEN_PASSWORD environment variable not set.");
-        return new Response(JSON.stringify({ error: 'Server not configured for password' }), { status: 500 });
-    }
-
-    if (password === correctPassword) {
-        return new Response(JSON.stringify({ success: true }), { status: 200 });
-    } else {
-        return new Response(JSON.stringify({ error: 'Invalid password' }), { status: 401 }); // 401 Unauthorized
-    }
-}
-
 
 /**
  * Translates text to English using Gemini Flash
@@ -256,10 +222,9 @@ async function handleGenerate(data, apiKey, context) {
 
 /**
  * Edits (or generates) an image using Gemini 2.5 Flash Image
- * ★ 変更(④): この関数はアスペクト比をAPIに渡しません。フロントエンドでパディング処理が行われます。
  */
 async function handleEdit(data, apiKey, context) {
-    // ★ 修正: aspectRatio は受け取るが、APIペイロードでは使用しない
+    // ★ 修正: aspectRatio と model を data から取得
     const { prompt, baseImage, aspectRatio, model } = data; 
     
     // 'edit' (baseImageあり) or 'generate' (baseImageなし)
@@ -331,11 +296,11 @@ async function handleEdit(data, apiKey, context) {
     // --- Asynchronously save to GAS ---
     const gasUrl = context.env.GAS_WEB_APP_URL;
     if (gasUrl) {
-        const gasPrompt = isEditingMode ? `[Edit] ${prompt}` : prompt;
+        const gasPrompt = isEditMode ? `[Edit] ${prompt}` : prompt;
         const saveData = {
             prompt: gasPrompt,
-            translatedPrompt: gasPrompt, // Geminiは翻訳しないので元のプロンプト
-            base64Data: base64, // ★ パディング前の元画像をGASに保存
+            translatedPrompt: gasPrompt,
+            base64Data: base64,
             model: model 
         };
         context.waitUntil(
