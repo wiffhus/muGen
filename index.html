@@ -25,10 +25,12 @@
                 min-height: 100vh;
                 min-height: 100dvh; /* Dynamic viewport height */
             }
+            /* ★ 修正2: スマホでの main の padding-bottom は JS で制御 */
+            /*
             main {
-                /* フッターの固定分のパディング (可変なので大きめに確保) */
-                padding-bottom: 16rem; /* 256px */
+                padding-bottom: 16rem; 
             }
+            */
         }
 
 
@@ -273,8 +275,8 @@
         </div>
     </aside>
 
-    <!-- ★ 変更(③): h-full, overflow-hidden を削除し、overflow-y-auto (スマホ用) を追加 -->
-    <main id="main-content" class="flex-1 flex flex-col transition-all duration-300 ease-in-out md:ml-64 overflow-y-auto md:overflow-hidden md:h-screen">
+    <!-- ★ 修正2: PCでの overflow-hidden を解除し、h-screen を維持 -->
+    <main id="main-content" class="flex-1 flex flex-col transition-all duration-300 ease-in-out md:ml-64 overflow-y-auto md:overflow-y-visible md:h-screen">
         
         <header class="flex-shrink-0 bg-gray-900/70 backdrop-blur-sm h-16 flex items-center px-6 shadow-md z-20">
             <!-- ★ 変更: md:hidden を削除し、トグルボタンに -->
@@ -292,10 +294,10 @@
             </div>
         </header>
 
-        <!-- ★ 変更(③): p-4 md:p-8, overflow-hidden を削除。スマホではスクロール対象に -->
-        <div class="flex-1 flex items-center justify-center p-4 md:p-8 relative">
-            <!-- ★ 変更: ドラッグ＆ドロップとファイル入力対応 -->
-            <div id="image-display" class="w-full h-full max-w-3xl max-h-[70vh] flex items-center justify-center bg-gray-800 rounded-lg shadow-inner relative border-2 border-transparent transition-all">
+        <!-- ★ 修正2: ID追加、PCで overflow-y-auto を追加 -->
+        <div id="image-container-parent" class="flex-1 flex items-center justify-center p-4 md:p-8 relative md:overflow-y-auto">
+            <!-- ★ 修正2: h-full を削除, max-h-[70vh] -> max-h-full に変更 -->
+            <div id="image-display" class="w-full max-w-3xl max-h-full flex items-center justify-center bg-gray-800 rounded-lg shadow-inner relative border-2 border-transparent transition-all">
                 <img id="generated-image" src="" alt="Generated Image" class="hidden max-w-full max-h-full object-contain rounded-lg">
                 <!-- ★ 変更: アップロード機能追加 -->
                 <div id="placeholder" class="text-gray-500 flex flex-col items-center justify-center p-8 text-center">
@@ -326,10 +328,10 @@
             </div>
         </div>
 
-        <!-- ★ 変更(③): Prompt Input Area (スマホで下部固定に) -->
-        <footer class="flex-shrink-0 p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm 
+        <!-- ★ 修正2: ID追加, md:relative, md:z-10, md:left-64 を削除 (JSで制御) -->
+        <footer id="footer-controls" class="flex-shrink-0 p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm 
                        fixed bottom-0 left-0 right-0 z-20 
-                       md:relative md:z-10">
+                       transition-all duration-300 ease-in-out">
             <form id="generation-form" class="max-w-4xl mx-auto">
                 <!-- Options Toolbar -->
                 <!-- ★ 変更: ツールバー自体は常に flex -->
@@ -584,6 +586,9 @@
         const passwordSubmitButton = document.getElementById('password-submit-button');
         const passwordError = document.getElementById('password-error');
 
+        // ★ 追加(修正2): フッター
+        const footerControls = document.getElementById('footer-controls');
+
 
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -591,7 +596,8 @@
             checkPassword(); 
             
             initDB();
-            initSidebar();
+            initSidebar(); // ★ 修正2: initLayoutより先に実行
+            initLayout(); // ★ 修正2: 追加
             initStyles();
             initListeners();
             loadHistory();
@@ -819,6 +825,9 @@
                 mainContent.classList.remove('md:ml-64');
                 isSidebarOpen = false;
             }
+            
+            // ★ 修正2: adjustFooterMargin を初期化時に呼び出し
+            adjustFooterMargin();
 
             sidebarToggleButton.addEventListener('click', toggleSidebar);
             
@@ -848,6 +857,40 @@
                 }
                 isSidebarOpen = false;
             }
+            
+            // ★ 追加(修正2): フッターマージンを調整
+            adjustFooterMargin();
+            // ★ 追加(修正2): レイアウト再計算
+            setTimeout(initLayout, 300); // transition 完了後
+        }
+
+        // ★ 追加(修正2): レイアウト調整
+        function initLayout() {
+            if (!footerControls) return;
+            // フッターの高さを取得
+            const footerHeight = footerControls.offsetHeight;
+            
+            // main に padding-bottom を設定 (スマホ・PC共通)
+            if (window.innerWidth >= 768) {
+                // PC (p-8 = 32px相当のマージン)
+                mainContent.style.paddingBottom = `${footerHeight + 32}px`;
+            } else {
+                // スマホ (p-4 = 16px相当のマージン)
+                mainContent.style.paddingBottom = `${footerHeight + 16}px`;
+            }
+            
+            // サイドバーの状態に応じてフッターの左マージンを調整
+            adjustFooterMargin();
+        }
+
+        // ★ 追加(修正2): フッターマージン調整
+        function adjustFooterMargin() {
+            if (!footerControls) return;
+            if (window.innerWidth >= 768 && isSidebarOpen) { // PC かつ サイドバーが開いている
+                footerControls.classList.add('md:left-64');
+            } else { // スマホ or サイドバーが閉じている
+                footerControls.classList.remove('md:left-64');
+            }
         }
 
 
@@ -873,6 +916,9 @@
             
             generationForm.addEventListener('submit', handleGenerationSubmit);
             translateButton.addEventListener('click', handleTranslate);
+
+            // ★ 追加(修正2): リサイズ
+            window.addEventListener('resize', initLayout); 
             
             // ★ 追加: プロンプトボタンリスナー
             promptCopyButton.addEventListener('click', handlePromptCopy);
@@ -1120,9 +1166,27 @@
         }
 
         // ★ 変更(④): キャンセル機能 + エラー時のGAS送信 + アスペクト比対応
+        // ★ 変更(修正1): isEditingMode の状態を送信前に再評価
         async function handleGenerationSubmit(event) {
             if (event) event.preventDefault(); 
             
+            // ★ 修正１: isEditingMode の状態を「モデル選択」と「画像有無」に基づいて決定する
+            const model = modelSelect.value;
+            
+            if (model === 'gemini-2.5-flash-image-preview' && currentEditImageBase64) {
+                // Gemini かつ 画像あり の場合のみ編集モード
+                if (!isEditingMode) {
+                    toggleEditMode(true); // UIを同期させる
+                }
+                isEditingMode = true;
+            } else {
+                // それ以外 (Imagen or 画像なし)
+                if (isEditingMode) {
+                    toggleEditMode(false); // UIを同期させる
+                }
+                isEditingMode = false;
+            }
+
             // ★ キャンセルロジック
             if (generationInProgress) {
                 if (currentFetchController) {
@@ -1139,7 +1203,7 @@
                 return;
             }
 
-            // ★ 編集モードでベース画像がない場合のエラー
+            // ★ 編集モードでベース画像がない場合のエラー (上記ロジックにより、ここは通らないはず)
             if (isEditingMode && !currentEditImageBase64) {
                  showToast("No image loaded for editing. Please upload or generate an image.", "warning");
                  toggleEditMode(false); // 編集モードを解除
@@ -1156,7 +1220,7 @@
             closeImageButton.classList.add('hidden'); // ★ 生成中は非表示
 
             const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value);
-            const model = modelSelect.value; 
+            // const model = modelSelect.value; // ★ 修正1: 上で定義済み
             const aspectRatio = aspectRatioSelect.value; // ★ 取得
             apiKeyCounter++; 
             
@@ -1164,13 +1228,13 @@
             const apiAspectRatio = (model === 'imagen-3.0-generate') ? aspectRatio : '1:1';
 
             const payload = {
-                action: isEditingMode ? 'edit' : 'generate',
+                action: isEditingMode ? 'edit' : 'generate', // ★ 修正1: 上で確定済み
                 prompt: prompt,
                 model: model, 
                 keyIndex: apiKeyCounter, 
                 aspectRatio: apiAspectRatio, // ★ Imagen用のアスペクト比
                 styles: selectedStyles,
-                baseImage: isEditingMode ? currentEditImageBase64 : null
+                baseImage: isEditingMode ? currentEditImageBase64 : null // ★ 修正1: 上で確定済み
             };
 
             const retryCount = parseInt(autoRetrySelect.value, 10);
@@ -1209,6 +1273,8 @@
                     closeImageButton.classList.remove('hidden'); // ★ 表示
                     
                     // ★ 変更(6): 新規生成 ( !isEditingMode ) の場合、自動で編集モードに移行しない
+                    // (★ 修正1: isEditingMode の決定ロジックが変更されたため、このコメントはもはや不要だが、
+                    //    意図した動作 (Gemini通常生成後に自動で編集モードにならない) は維持される)
                     // if (!isEditingMode) {
                     //      if (model === 'gemini-2.5-flash-image-preview') {
                     //         toggleEditMode(true);
