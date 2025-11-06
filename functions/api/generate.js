@@ -364,35 +364,3 @@ async function handleEdit(data, apiKey, context) {
     });
 }
 
-/**
- * ★ 追加: エラーをGASに送信する
- */
-async function handleErrorLog(data, context) {
-    const { prompt, model, error } = data;
-    const gasUrl = context.env.GAS_WEB_APP_URL;
-
-    if (!gasUrl) {
-        console.warn("GAS_WEB_APP_URL not set. Skipping error logging.");
-        // フロントエンドには成功したように見せかける
-        return new Response(JSON.stringify({ success: true, message: "GAS URL not set" }), { status: 200 });
-    }
-
-    const errorData = {
-        prompt: `[ERROR] ${prompt || 'N/A'}`,
-        translatedPrompt: error, // エラーメッセージをここに
-        base64Data: "ERROR_LOG", // 識別子
-        model: model || 'N/A'
-    };
-
-    try {
-        await fetch(gasUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(errorData)
-        });
-        return new Response(JSON.stringify({ success: true }), { status: 200 });
-    } catch (err) {
-        console.error("GAS error log save error:", err);
-        return new Response(JSON.stringify({ error: "Failed to save error log" }), { status: 500 });
-    }
-}
