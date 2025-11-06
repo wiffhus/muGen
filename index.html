@@ -353,6 +353,14 @@
                             <option value="-1">Custom...</option>
                         </select>
                     </div>
+                    
+                    <!-- ★ 依頼①: Edit with 2.5 flash ボタン -->
+                    <div id="edit-with-flash-group" class="flex items-end">
+                        <button type="button" id="edit-with-flash-button" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition flex items-center gap-2" data-tooltip="Switch to Edit Mode with Gemini 2.5 Flash">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
+                            Edit with 2.5 flash
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Styles (Accordion) -->
@@ -474,6 +482,9 @@
             "Fantasy art", "Minimalism", "Animation", "Ghibli-style", "Disney-style"
         ];
         
+        // ★ 依頼④: カスタムスタイル用
+        const CUSTOM_STYLES_KEY = 'muGenCustomStyles';
+
         // ★ 追加: 料金計算用 (仮の単価)
         const PRICE_IMAGEN_USD = 0.02; // Imagen 3.0 (仮)
         const PRICE_GEMINI_FLASH_IMAGE_USD = 0.002; // Gemini Flash Image (仮)
@@ -544,6 +555,8 @@
         const aspectRatioGroup = document.getElementById('aspect-ratio-group');
         const autoRetryGroup = document.getElementById('auto-retry-group');
 
+        // ★ 依頼①: Edit ボタン
+        const editWithFlashButton = document.getElementById('edit-with-flash-button');
 
         // ★ Styles Accordion Elements
         const stylesToggleBtn = document.getElementById('styles-toggle');
@@ -583,8 +596,8 @@
             
             initDB();
             initSidebar();
-            initStyles();
-            initListeners();
+            initStyles(); // ★ 依頼④: 変更あり
+            initListeners(); // ★ 依頼①: 変更あり
             loadHistory();
             
             // ★ 追加: フッターパディングの初期設定
@@ -641,6 +654,70 @@
             } finally {
                 setLoading(authSubmit, false);
             }
+        }
+
+        // --- ★ 依頼④: CUSTOM STYLE FUNCTIONS ---
+    
+        /**
+         * localStorage からカスタムスタイルを取得
+         * @returns {string[]}
+         */
+        function getCustomStyles() {
+            try {
+                const styles = localStorage.getItem(CUSTOM_STYLES_KEY);
+                return styles ? JSON.parse(styles) : [];
+            } catch (e) {
+                console.error("Failed to parse custom styles:", e);
+                return [];
+            }
+        }
+        
+        /**
+         * localStorage にカスタムスタイルを保存
+         * @param {string[]} stylesArray
+         */
+        function saveCustomStyles(stylesArray) {
+            try {
+                localStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(stylesArray));
+            } catch (e) {
+                console.error("Failed to save custom styles:", e);
+                showToast("Failed to save custom style", "error");
+            }
+        }
+        
+        /**
+         * カスタムスタイルを追加する
+         */
+        function handleAddCustomStyle() {
+            const newStyle = prompt("Enter new style name (e.g., 'Pixel art', 'Anime'):");
+            if (newStyle && newStyle.trim().length > 0) {
+                const trimmedStyle = newStyle.trim();
+                const customStyles = getCustomStyles();
+                
+                // 重複チェック (STYLES と customStyles の両方)
+                const allStyles = [...STYLES, ...customStyles];
+                if (allStyles.map(s => s.toLowerCase()).includes(trimmedStyle.toLowerCase())) {
+                    showToast(`Style "${trimmedStyle}" already exists.`, "warning");
+                    return;
+                }
+                
+                customStyles.push(trimmedStyle);
+                saveCustomStyles(customStyles);
+                initStyles(); // スタイルリストを再描画
+                showToast(`Style "${trimmedStyle}" added.`, "success");
+            }
+        }
+        
+        /**
+         * カスタムスタイルを削除する
+         * @param {string} styleToRemove
+         */
+        function handleRemoveCustomStyle(styleToRemove) {
+            let customStyles = getCustomStyles();
+            customStyles = customStyles.filter(s => s !== styleToRemove);
+            saveCustomStyles(customStyles);
+            initStyles(); // スタイルリストを再描画
+            showToast(`Style "${styleToRemove}" removed.`, "success");
         }
 
 
@@ -838,20 +915,64 @@
             }
         }
 
-
+        // ★ 依頼④: initStyles を大幅に変更 (カスタムスタイル対応)
         function initStyles() {
             const container = document.getElementById('styles-container');
-            STYLES.forEach(style => {
+            container.innerHTML = ""; // 既存のスタイルをクリア
+        
+            const allStyles = [...STYLES, ...getCustomStyles()];
+        
+            allStyles.forEach(style => {
+                const isCustom = !STYLES.includes(style); // これがカスタムスタイルか？
+                
                 const div = document.createElement('div');
-                div.className = ""; 
+                // ★ 依頼④: カスタムスタイル用のコンテナ（削除ボタンを含むため）
+                div.className = "flex items-center gap-1"; 
+                
+                const inputId = `style-${style.replace(/[^a-zA-Z0-9]/g, '-')}`; // IDのサニタイズ
+        
+                let labelClass = "cursor-pointer bg-gray-700 text-gray-300 border border-gray-600 rounded-full px-4 py-2 text-sm font-medium hover:bg-gray-600 transition";
+                
+                // ★ 依頼④: カスタムスタイルは色を変え、丸みを調整
+                if (isCustom) {
+                     labelClass = "cursor-pointer bg-teal-800 text-teal-100 border border-teal-600 rounded-l-full px-4 py-2 text-sm font-medium hover:bg-teal-700 transition";
+                }
+        
                 div.innerHTML = `
-                    <input type="checkbox" id="style-${style}" value="${style}" class="hidden style-checkbox">
-                    <label for="style-${style}" class="cursor-pointer bg-gray-700 text-gray-300 border border-gray-600 rounded-full px-4 py-2 text-sm font-medium hover:bg-gray-600 transition">
+                    <input type="checkbox" id="${inputId}" value="${style}" class="hidden style-checkbox">
+                    <label for="${inputId}" class="${labelClass}">
                         ${style}
                     </label>
                 `;
+                
+                // ★ 依頼④: カスタムスタイルなら削除ボタンを追加
+                if (isCustom) {
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = "button";
+                    removeBtn.className = "bg-teal-800 text-teal-200 border border-teal-600 border-l-0 rounded-r-full py-2 px-2 text-sm font-medium hover:bg-red-700 hover:text-white transition";
+                    removeBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>`;
+                    removeBtn.dataset.tooltip = "Remove style";
+                    removeBtn.onclick = (e) => {
+                        e.stopPropagation(); // チェックボックスの動作を止める
+                        handleRemoveCustomStyle(style);
+                    };
+                    div.appendChild(removeBtn);
+                }
+                
                 container.appendChild(div);
             });
+        
+            // ★ 依頼④: 最後に「+」ボタンを追加
+            const addBtnContainer = document.createElement('div');
+            addBtnContainer.innerHTML = `
+                <button type="button" id="add-style-button" class="cursor-pointer bg-gray-600 text-gray-300 border border-gray-500 rounded-full px-4 py-2 text-sm font-medium hover:bg-indigo-600 hover:text-white transition flex items-center gap-1" data-tooltip="Add custom style">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Add
+                </button>
+            `;
+            // イベントリスナーを追加
+            addBtnContainer.querySelector('#add-style-button').addEventListener('click', handleAddCustomStyle);
+            container.appendChild(addBtnContainer);
         }
 
         // --- EVENT LISTENERS ---
@@ -859,7 +980,7 @@
             // ★ 認証フォーム
             authForm.addEventListener('submit', handleAuthSubmit);
 
-            generationForm.addEventListener('submit', handleGenerationSubmit);
+            generationForm.addEventListener('submit', handleGenerationSubmit); // ★ 依頼③: 変更あり
             translateButton.addEventListener('click', handleTranslate);
             
             // ★ 追加: プロンプトボタンリスナー
@@ -870,6 +991,9 @@
             modalCopy.addEventListener('click', handleModalCopy);
             modalRegenerate.addEventListener('click', handleModalRegenerate);
             modalEdit.addEventListener('click', handleModalEdit); // ★ 追加
+
+            // ★ 依頼①: リスナー追加
+            editWithFlashButton.addEventListener('click', () => toggleEditMode(true)); 
             
             editButton.addEventListener('click', () => toggleEditMode(true)); 
             closeImageButton.addEventListener('click', closeImage); // ★ 追加
@@ -1032,6 +1156,7 @@
         }
 
         // ★ 変更: 編集モードインジケーター制御 + ツールバー制御
+        // ★ 依頼②: autoRetryGroup の非表示を解除
         function toggleEditMode(forceOn) { 
             isEditingMode = forceOn;
             
@@ -1047,7 +1172,10 @@
                 // ★ 変更: ツールバーの項目を個別に制御
                 optionsToolbar.style.display = 'flex'; // ツールバー自体は表示
                 modelSelectGroup.style.display = 'none'; // モデル選択は隠す
-                autoRetryGroup.style.display = 'none'; // リトライも隠す
+                
+                // ★ 依頼②: 編集モードでもリトライを表示
+                autoRetryGroup.style.display = 'block'; 
+                
                 // ★ 修正: Gemini編集モードではアスペクト比は非表示 (APIがサポートしていないため)
                 aspectRatioGroup.style.display = 'none'; 
                 
@@ -1121,6 +1249,7 @@
         }
 
         // ★ 変更: キャンセル機能 + エラー時のGAS送信
+        // ★ 依頼③: スタイルのみ編集のロジックを反映
         async function handleGenerationSubmit(event) {
             if (event) event.preventDefault(); 
             
@@ -1134,11 +1263,23 @@
                 return;
             }
 
+            // ★ 依頼③: ロジック変更
             const prompt = promptInput.value;
-            if (!prompt) {
+            const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value);
+            
+            let finalPrompt = prompt;
+            
+            if (isEditingMode && !prompt && selectedStyles.length > 0) {
+                // 編集モード、プロンプト無し、スタイル有りの場合
+                // 続行し、プロンプトを自動生成
+                finalPrompt = `Apply the following style(s): ${selectedStyles.join(', ')}`;
+                showToast(`Applying style(s) as edit instruction...`, "info");
+            } else if (!prompt) {
+                // 上記以外でプロンプトが無い場合はエラー
                 showToast("Please enter a prompt", "warning");
                 return;
             }
+            // ★ 依頼③: ここまで
 
             // ★ 編集モードでベース画像がない場合のエラー
             if (isEditingMode && !currentEditImageBase64) {
@@ -1156,13 +1297,13 @@
             editButton.classList.add('hidden');
             closeImageButton.classList.add('hidden'); // ★ 生成中は非表示
 
-            const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value);
+            // const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value); // ★ 上に移動済み
             const model = modelSelect.value; 
             apiKeyCounter++; 
             
             const payload = {
                 action: isEditingMode ? 'edit' : 'generate',
-                prompt: prompt,
+                prompt: finalPrompt, // ★ 依頼③: finalPrompt を使用
                 model: model, 
                 keyIndex: apiKeyCounter, 
                 aspectRatio: aspectRatioSelect.value, // ★ 編集モードでも送信するが、サーバー側 (generate.js) で無視される
@@ -1189,7 +1330,7 @@
                     currentEditImageBase64 = data.base64; // Save for editing
                     
                     // ★ 変更: モデル情報、アスペクト比、スタイルを渡す
-                    saveImageToDB(prompt, data.translatedPrompt || prompt, base64, model, aspectRatioSelect.value, selectedStyles); 
+                    saveImageToDB(finalPrompt, data.translatedPrompt || finalPrompt, base64, model, aspectRatioSelect.value, selectedStyles); 
                     showToast(isEditingMode ? "Edit successful" : "Generation successful", "success");
                     editButton.classList.remove('hidden');
                     closeImageButton.classList.remove('hidden'); // ★ 表示
@@ -1204,7 +1345,8 @@
                     }
 
                     // ★ 追加: 生成成功後、プロンプトをクリア
-                    if (!isEditingMode) { // 編集モードの時はクリアしない
+                    // ★ 依頼③: スタイルのみ編集の場合、自動生成したプロンプトが残るのでクリアする
+                    if (!isEditingMode || (isEditingMode && !prompt && selectedStyles.length > 0)) {
                         promptInput.value = "";
                     }
                     
