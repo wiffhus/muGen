@@ -1,1534 +1,382 @@
-<!DOCTYPE html>
-<!-- [変更] h-full を追加 (依頼③) -->
-<html lang="en" class="h-full">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>muGen - AI Image Generator</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- (Omitted: <style> block for brevity, assumed unchanged) -->
-    <style>
-        /* Inter Font (Mac-like) */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            overscroll-behavior: none;
-            /* [変更] h-screen (100vh) を h-full (100%) にするため、
-               JSで高さを設定するまでの間のフォールバック (依頼③) */
-            height: 100vh; 
+/**
+ * Cloudflare Function (Node.js)
+ * Handles API requests for translation, image generation, and editing.
+ * Deployed at /functions/api/generate.js
+ */
+
+const IMAGEN_API_URL_PREDICT = "https://generativelang
+uage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict";
+// ★ 変更: モデル名を 'gemini-2.5-flash-image-preview' に
+const GEMINI_API_URL_FLASH_IMAGE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent";
+const GEMINI_API_URL_FLASH = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
+
+
+/**
+ * APIキーを取得する
+ * (Cloudflare Envから)
+ */
+function getApiKey(context, model, keyIndex) {
+    const keyPoolSize = 10; // 01から10までのキー
+    const index = (keyIndex || 0) % keyPoolSize + 1;
+    const keyIndexStr = index.toString().padStart(2, '0');
+    
+    let apiKeyEnvVar;
+    
+    // ★ 変更: モデルに応じてキー変数を切り替え
+    if (model === 'gemini-2.5-flash-image-preview') {
+        apiKeyEnvVar = `GEMINI_FLASH_IMAGE_API_KEY_${keyIndexStr}`;
+    } else {
+        // デフォルト (Imagen / Translate)
+        apiKeyEnvVar = `GEMINI_API_KEY_${keyIndexStr}`;
+    }
+
+    const apiKey = context.env[apiKeyEnvVar];
+    
+    if (!apiKey) {
+        console.error(`Missing API Key: ${apiKeyEnvVar}`);
+        throw new Error(`Server configuration error: Missing API Key (${apiKeyEnvVar})`);
+    }
+    return apiKey;
+}
+
+
+/**
+ * Handles all POST requests
+ * @param {EventContext} context - Cloudflare context (contains env, request)
+ */
+export async function onRequest(context) {
+    if (context.request.method !== 'POST') {
+        return new Response(JSON.stringify({ error: 'Method Not Allowed' }), { status: 405 });
+    }
+
+    try {
+        const data = await context.request.json();
+        const { action, model, keyIndex } = data;
+
+        // --- [新規追加] パスワード認証処理 ---
+        // 依頼①: 'authenticate' アクションが来たら、APIキー取得の前にパスワード検証を行う
+        if (action === 'authenticate') {
+            return await handleAuthenticate(data, context);
+        }
+        // ------------------------------------
+
+        // ★ 追加: エラーロギングアクション
+        if (action === 'logError') {
+            return await handleErrorLog(data, context);
         }
 
-        /* Custom scrollbar for sidebar */
-        .sidebar-scroll::-webkit-scrollbar {
-            width: 4px;
-        }
-        .sidebar-scroll::-webkit-scrollbar-thumb {
-            background-color: #4b5563;
-            border-radius: 4px;
-        }
-        .sidebar-scroll::-webkit-scrollbar-track {
-            background-color: #1f2937;
-        }
+        // ★ 変更: アクションとモデルに応じてAPIキーを取得
+        // (認証処理の後ろに移動)
+        const apiKey = getApiKey(context, model, keyIndex);
 
-        /* Dynamic Noise Animation */
-        .noise-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #111827;
-            z-index: 10;
-            display: none; /* Hidden by default */
-            opacity: 0;
-            transition: opacity 0.3s ease-in-out;
-        }
-        .noise-container.active {
-            display: block;
-            opacity: 1;
-        }
-        .noise-container::before {
-            content: "";
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-            background-size: 128px 128px;
-            opacity: 0.15;
-            animation: noise-animation 0.2s linear infinite;
-        }
-        @keyframes noise-animation {
-            0% { transform: translate(0, 0); }
-            10% { transform: translate(-5%, -5%); }
-            20% { transform: translate(-10%, 5%); }
-            30% { transform: translate(5%, -10%); }
-            40% { transform: translate(-5%, 15%); }
-            50% { transform: translate(-10%, -5%); }
-            60% { transform: translate(15%, 0); }
-            70% { transform: translate(0, 10%); }
-            80% { transform: translate(-15%, 0); }
-            90% { transform: translate(10%, 5%); }
-            100% { transform: translate(5%, 0); }
-        }
-
-        /* Custom Checkbox */
-        .style-checkbox:checked + label {
-            background-color: #4f46e5;
-            border-color: #4f46e5;
-            color: #ffffff;
-        }
-
-        /* Modal styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 50;
-            inset: 0;
-            overflow-y: auto;
-            background-color: rgba(0, 0, 0, 0.7);
-            align-items: center;
-            justify-content: center;
-        }
-        .modal.flex {
-            display: flex;
-        }
-
-        /* Tooltip */
-        [data-tooltip] {
-            position: relative;
-        }
-        [data-tooltip]:hover::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 110%;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #1f2937;
-            color: #ffffff;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            white-space: nowrap;
-            z-index: 60;
-            opacity: 1;
-            transition: opacity 0.2s;
-        }
-
-        /* Chevron rotation for accordion */
-        .rotate-180 {
-            transform: rotate(180deg);
-        }
-
-        /* ★ Drag over effect */
-        .drag-over {
-            border-style: dashed;
-            border-color: #4f46e5;
-            background-color: #1f2937;
-        }
-
-        /* ★ 追加: History Marquee */
-        .history-info-container {
-            width: 100%;
-            overflow: hidden;
-            white-space: nowrap;
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            background: rgba(0, 0, 0, 0.7);
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none; /* 下の画像をクリックできるように */
-        }
-        .group:hover .history-info-container {
-            opacity: 1;
-        }
-        .history-info-text-wrapper {
-            display: inline-block;
-            white-space: nowrap;
-            /* アニメーションは長めの時間 (25秒) に設定 */
-            animation: marquee 25s linear infinite;
-        }
-        .history-info-text {
-            display: inline-block;
-            padding: 4px 12px; /* 左右にパディング */
-            color: white;
-            font-size: 10px;
-        }
-        
-        @keyframes marquee {
-            0%   { transform: translateX(0); }
-            /* テキスト2回分の半分を動かす */
-            100% { transform: translateX(-50%); } 
-        }
-
-        /* ★ 変更: トースト/エラー表示 */
-        #toast {
-            max-width: 400px;
-            word-break: break-word;
-        }
-
-    </style>
-</head>
-<!-- [変更] h-screen -> h-full (依頼③) -->
-<body class="bg-gray-900 text-gray-100 h-full w-screen overflow-hidden flex">
-
-    <!-- (Omitted: Inline SVG Icons Definition for brevity) -->
-    <svg width="0" height="0" class="hidden">
-        <!-- ... (既存のSVGアイコン定義は変更なし) ... -->
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-menu">
-            <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-x">
-            <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
-        </symbol>
-        <!-- ★ 変更: 翻訳アイコン (Lucide 'Type' icon) -->
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-translate">
-            <polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-send">
-            <line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </symbol>
-        <!-- ★ 追加: 停止アイコン (Stop Circle) -->
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-stop">
-            <circle cx="12" cy="12" r="10"></circle><rect x="9" y="9" width="6" height="6"></rect>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-image">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-edit">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-copy">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-refresh">
-            <polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-loader">
-            <line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" id="icon-chevron-down">
-             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-        </symbol>
-        <!-- ★ 追加: アップロードアイコン -->
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-upload">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line>
-        </symbol>
-        <!-- ★ 追加: 入力クリアアイコン (X Circle) -->
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-x-circle">
-            <circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>
-        </symbol>
-    </svg>
-
-    <!-- ★ 変更: サイドバー 初期状態を md:translate-x-0 (PC表示) に -->
-    <!-- [変更なし] サイドバーは既存のまま -->
-    <aside id="sidebar" class="bg-gray-800 h-full w-64 p-4 flex flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
-        <div class="flex justify-between items-center mb-4">
-            <h1 class="text-xl font-bold text-white">muGen History</h1>
-            <!-- ★ 変更: md:hidden (スマホ専用クローズ) -->
-            <button id="close-sidebar" class="md:hidden text-gray-400 hover:text-white">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
-            </button>
-        </div>
-        
-        <!-- ★ 追加: 統計情報 -->
-        <div id="history-stats" class="mb-4 p-3 bg-gray-700 rounded-lg">
-            <div class="flex justify-between text-sm">
-                <span class="text-gray-300">Total Images:</span>
-                <span id="stats-total-images" class="font-medium text-white">0</span>
-            </div>
-            <div class="flex justify-between text-sm mt-1">
-                <span class="text-gray-300">Est. Cost (USD):</span>
-                <span id="stats-cost-usd" class="font-medium text-white">$0.00</span>
-            </div>
-            <div class="flex justify-between text-sm mt-1">
-                <span class="text-gray-300">Est. Cost (JPY):</span>
-                <span id="stats-cost-jpy" class="font-medium text-white">¥0</span>
-            </div>
-        </div>
-
-        <div id="history-container" class="flex-1 overflow-y-auto sidebar-scroll space-y-2">
-            <!-- History items will be injected here by JS -->
-            <p class="text-gray-400 text-sm">No generated images yet.</p>
-        </div>
-    </aside>
-
-    <!-- [変更] h-full -> h-full min-h-0 (依頼③) -->
-    <main id="main-content" class="flex-1 h-full min-h-0 flex flex-col transition-all duration-300 ease-in-out md:ml-64">
-        
-        <header class="flex-shrink-0 bg-gray-900/70 backdrop-blur-sm h-16 flex items-center px-6 shadow-md z-20">
-            <!-- ★ 変更: md:hidden を削除し、トグルボタンに -->
-            <button id="sidebar-toggle-button" class="text-gray-400 hover:text-white mr-4" data-tooltip="Toggle History">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-menu"></use></svg>
-            </button>
-            <div class="flex items-center space-x-2">
-                <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>
-                <span class="text-lg font-semibold text-white">muGen Image Generator</span>
-            </div>
-            <div class="flex space-x-2 ml-4">
-                <div class="w-3 h-3 rounded-full bg-gray-700"></div>
-                <div class="w-3 h-3 rounded-full bg-gray-700"></div>
-                <div class="w-3 h-3 rounded-full bg-gray-700"></div>
-            </div>
-        </header>
-
-        <!-- [変更] overflow-hidden -> overflow-y-auto min-h-0 (依頼③) -->
-        <div class="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-y-auto min-h-0">
-            <!-- ★ 変更: ドラッグ＆ドロップとファイル入力対応 -->
-            <div id="image-display" class="w-full h-full max-w-3xl max-h-[70vh] flex items-center justify-center bg-gray-800 rounded-lg shadow-inner relative border-2 border-transparent transition-all">
-                <img id="generated-image" src="" alt="Generated Image" class="hidden max-w-full max-h-full object-contain rounded-lg">
-                <!-- ★ 変更: アップロード機能追加 -->
-                <div id="placeholder" class="text-gray-500 flex flex-col items-center justify-center p-8 text-center">
-                    <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>
-                    <p class="mt-2">Your generated image will appear here</p>
-                    <p class="text-sm mt-4">or</p>
-                    <button id="upload-image-button" type="button" class="mt-4 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-upload"></use></svg>
-                        Upload Image to Edit
-                    </button>
-                    <input type="file" id="upload-image-input" class="hidden" accept="image/png, image/jpeg, image/webp">
-                    <p class="text-xs text-gray-600 mt-2">You can also drag & drop an image here</p>
-                </div>
-
-                <div id="loading-animation" class="noise-container">
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        <svg class="w-12 h-12 text-indigo-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-loader"></use></svg>
-                    </div>
-                </div>
-
-                <button id="edit-button" class="hidden absolute top-4 right-14 bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-full shadow-lg transition" data-tooltip="Edit Image">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
-                </button>
-                <!-- ★ 追加: 画像クローズボタン -->
-                <button id="close-image-button" class="hidden absolute top-4 right-4 bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full shadow-lg transition" data-tooltip="Close Image">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
-                </button>
-            </div>
-        </div>
-
-        <!-- Prompt Input Area (変更なし、flex-shrink-0 により下部固定) -->
-        <footer class="flex-shrink-0 p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm z-10">
-            <form id="generation-form" class="max-w-4xl mx-auto">
-                <!-- Options Toolbar -->
-                <!-- ★ 変更: ツールバー自体は常に flex -->
-                <div class="flex flex-wrap gap-4 mb-4" id="options-toolbar">
-                    <!-- ★ 変更: ID追加 -->
-                    <div id="model-select-group">
-                        <label for="model-select" class="block text-sm font-medium text-gray-300 mb-1">Model</label>
-                        <select id="model-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
-                            <option value="imagen-3.0-generate">Imagen 3.0</option>
-                            <option value="gemini-2.5-flash-image-preview">Gemini 2.5 Flash Image</option>
-                        </select>
-                    </div>
-                    <!-- ★ 変更: ID追加 -->
-                    <div id="aspect-ratio-group">
-                        <label for="aspect-ratio-select" class="block text-sm font-medium text-gray-300 mb-1">Aspect Ratio</label>
-                        <select id="aspect-ratio-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
-                            <option value="1:1">1:1 Square</option>
-                            <option value="16:9">16:9 Landscape</option>
-                            <option value="9:16">9:16 Portrait</option>
-                            <option value="4:3">4:3 Standard</option>
-                            <option value="3:2">3:2 Photo</option>
-                        </select>
-                    </div>
-                    <!-- ★ 変更: ID追加 -->
-                    <div id="auto-retry-group">
-                        <label for="auto-retry-select" class="block text-sm font-medium text-gray-300 mb-1">Auto Retry</label>
-                        <select id="auto-retry-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
-                            <option value="0">Off</option>
-                            <option value="3">3 Times</option>
-                            <option value="5">5 Times</option>
-                            <option value="10">10 Times</option>
-                            <option value="-1">Custom...</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Styles (Accordion) -->
-                <div class="mb-4">
-                    <button type="button" id="styles-toggle" class="flex justify-between items-center w-full p-2 rounded-lg hover:bg-gray-700 transition">
-                        <label class="block text-sm font-medium text-gray-300 cursor-pointer">Styles (Optional, multiple)</label>
-                        <svg id="styles-chevron" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <use href="#icon-chevron-down"></use>
-                        </svg>
-                    </button>
-                    <div id="styles-container" class="hidden max-h-48 overflow-y-auto flex flex-wrap gap-2 p-3 bg-gray-700/50 rounded-lg mt-2">
-                        <!-- Styles will be injected here by JS -->
-                    </div>
-                </div>
-
-                <!-- ★ 追加: 編集モードインジケーター -->
-                <div id="edit-mode-indicator" class="hidden text-center text-indigo-300 text-sm font-medium p-2 bg-indigo-900/50 rounded-lg mt-3">
-                    🎨 Editing Mode - Subsequent generations will edit the current image. (Change model to Imagen 3.0 to exit)
-                </div>
-
-                <!-- ★ 変更: Prompt Input (mt-4追加) -->
-                <div class="relative mt-4">
-                    <!-- ★ 変更: pr-32 -> pr-48 (ボタン追加のため) -->
-                    <textarea id="prompt-input" rows="2" class="block w-full p-4 pr-48 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Enter your prompt... (Non-English will be translated)"></textarea>
-                    
-                    <!-- ★ 追加: コピー/クリアボタン -->
-                    <div class="absolute bottom-3 right-32 flex space-x-2">
-                         <button id="prompt-copy-button" type="button" class="p-2 bg-gray-600 text-gray-400 rounded-lg hover:bg-gray-500 hover:text-gray-200 transition" data-tooltip="Copy Prompt">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-copy"></use></svg>
-                        </button>
-                         <button id="prompt-clear-button" type="button" class="p-2 bg-gray-600 text-gray-400 rounded-lg hover:bg-gray-500 hover:text-gray-200 transition" data-tooltip="Clear Input">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x-circle"></use></svg>
-                        </button>
-                    </div>
-
-                    <!-- ★ 変更: pr-48 に合わせて right-3 のまま -->
-                    <div class="absolute bottom-3 right-3 flex space-x-2">
-                        <button id="translate-button" type="button" class="p-2 bg-gray-600 text-gray-300 rounded-lg hover:bg-gray-500 transition" data-tooltip="Translate to English">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-translate"></use></svg>
-                        </button>
-                        <!-- ★ 変更: アイコンはJSで切り替え -->
-                        <button id="generate-button" type="submit" class="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition" data-tooltip="Generate">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-send"></use></svg>
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </footer>
-    </main>
-
-    <!-- (Omitted: Image Modal for brevity) -->
-    <div id="image-modal" class="modal">
-        <!-- ... (変更なし) ... -->
-        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col p-4">
-            <img id="modal-image" src="" class="max-w-full max-h-[70vh] object-contain mx-auto">
-            <div class="p-4 bg-gray-900 rounded-b-lg mt-4">
-                <p class="text-sm text-gray-300 mb-2">Prompt:</p>
-                <p id="modal-prompt" class="text-white bg-gray-700 p-3 rounded-lg"></p>
-                <!-- ★ 変更: モーダルにEditボタン追加 -->
-                <div class="flex flex-wrap gap-4 mt-4">
-                    <button id="modal-copy" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition" data-tooltip="Copy Prompt">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-copy"></use></svg>
-                        <span>Copy</span>
-                    </button>
-                    <button id="modal-regenerate" class="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg transition" data-tooltip="Regenerate Image">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-refresh"></use></svg>
-                        <span>Regenerate</span>
-                    </button>
-                    <button id="modal-edit" class="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition" data-tooltip="Load this image for editing">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
-                        <span>Edit</span>
-                    </button>
-                </div>
-            </div>
-            <button id="modal-close" class="absolute top-4 right-4 text-gray-400 hover:text-white">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
-            </button>
-        </div>
-    </div>
-
-    <!-- ★ 変更: トースト/エラー表示のHTML構造 -->
-    <div id="toast" class="fixed top-20 right-6 text-white py-3 px-4 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50">
-        <!-- ... (変更なし) ... -->
-        <div class="flex items-start justify-between">
-            <p id="toast-message" class="flex-1 pr-4">Message</p>
-            <div class="flex flex-col space-y-1">
-                <button id="toast-close" class="text-white hover:text-gray-200">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
-                </button>
-                <button id="toast-copy" class="hidden text-white hover:text-gray-200">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-copy"></use></svg>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- [新規追加] パスワード認証モーダル (依頼①) -->
-    <div id="password-modal" class="modal z-[100]"> <!-- z-indexを最前面に -->
-        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
-            <h2 class="text-lg font-semibold text-white mb-4">Authentication Required</h2>
-            <p class="text-sm text-gray-300 mb-4">Please enter the password to use muGen.</p>
-            
-            <form id="password-form">
-                <div>
-                    <label for="password-input" class="sr-only">Password</label>
-                    <input type="password" id="password-input" class="block w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Password" required>
-                </div>
-                
-                <!-- エラーメッセージ表示領域 -->
-                <p id="password-error" class="text-red-400 text-sm mt-2"></p>
-                
-                <button id="password-submit" type="submit" class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition">
-                    Unlock
-                </button>
-            </form>
-        </div>
-    </div>
-
-
-    <script>
-        // --- CONSTANTS & STATE ---
-        const STYLES = [
-            "Photorealistic", "Cinematic", "35mm film", "Black and white", "Impressionistic",
-            "Surrealism", "Watercolour", "Ukiyo-e", "Cyberpunk", "Steampunk",
-            "Fantasy art", "Minimalism", "Animation", "Ghibli-style", "Disney-style"
-        ];
-        
-        // ★ 追加: 料金計算用 (仮の単価)
-        const PRICE_IMAGEN_USD = 0.02; // Imagen 3.0 (仮)
-        const PRICE_GEMINI_FLASH_IMAGE_USD = 0.002; // Gemini Flash Image (仮)
-        const USD_JPY_RATE = 150; // 仮の為替レート
-
-        let db;
-        let apiKeyCounter = 0; 
-        let currentEditImageBase64 = null; 
-        let isEditingMode = false;
-        let lastEnterPress = 0; 
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-        // ★ 追加: 生成キャンセル用
-        let generationInProgress = false;
-        let currentFetchController = null;
-        // ★ 追加: トーストのタイマー
-        let toastTimeoutId = null;
-
-        // [新規追加] スワイプ状態管理 (依頼②)
-        let touchStartX = 0;
-        let touchStartY = 0; // 上下スクロールの誤爆防止用
-        let touchCurrentX = 0;
-
-
-        // --- DOM ELEMENTS ---
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('main-content');
-        // ★ 変更: サイドバートグルボタン
-        const sidebarToggleButton = document.getElementById('sidebar-toggle-button');
-        const closeSidebarBtn = document.getElementById('close-sidebar');
-        
-        const generationForm = document.getElementById('generation-form');
-        const promptInput = document.getElementById('prompt-input');
-        const translateButton = document.getElementById('translate-button');
-        const generateButton = document.getElementById('generate-button');
-        // ★ 追加: プロンプトボタン
-        const promptCopyButton = document.getElementById('prompt-copy-button');
-        const promptClearButton = document.getElementById('prompt-clear-button');
-
-        const loadingAnimation = document.getElementById('loading-animation');
-        const imageDisplay = document.getElementById('image-display');
-        const generatedImage = document.getElementById('generated-image');
-        const placeholder = document.getElementById('placeholder');
-        const historyContainer = document.getElementById('history-container');
-        
-        const modelSelect = document.getElementById('model-select');
-        const aspectRatioSelect = document.getElementById('aspect-ratio-select');
-        const autoRetrySelect = document.getElementById('auto-retry-select');
-        
-        const imageModal = document.getElementById('image-modal');
-        const modalImage = document.getElementById('modal-image');
-        const modalPrompt = document.getElementById('modal-prompt');
-        const modalCopy = document.getElementById('modal-copy');
-        const modalRegenerate = document.getElementById('modal-regenerate');
-        const modalClose = document.getElementById('modal-close');
-        const modalEdit = document.getElementById('modal-edit'); // ★ 追加
-        
-        const editButton = document.getElementById('edit-button');
-        const closeImageButton = document.getElementById('close-image-button'); // ★ 追加
-        const optionsToolbar = document.getElementById('options-toolbar');
-
-        // ★ 変更: ツールバー内のグループを取得
-        const modelSelectGroup = document.getElementById('model-select-group');
-        const aspectRatioGroup = document.getElementById('aspect-ratio-group');
-        const autoRetryGroup = document.getElementById('auto-retry-group');
-
-
-        // ★ Styles Accordion Elements
-        const stylesToggleBtn = document.getElementById('styles-toggle');
-        const stylesContainer = document.getElementById('styles-container');
-        const stylesChevron = document.getElementById('styles-chevron');
-
-        // ★ History Stats Elements
-        const statsTotalImages = document.getElementById('stats-total-images');
-        const statsCostUsd = document.getElementById('stats-cost-usd');
-        const statsCostJpy = document.getElementById('stats-cost-jpy');
-
-        // ★ Upload Elements
-        const uploadImageButton = document.getElementById('upload-image-button');
-        const uploadImageInput = document.getElementById('upload-image-input');
-
-        // ★ 追加: 編集モードインジケーター
-        const editModeIndicator = document.getElementById('edit-mode-indicator');
-        
-        // ★ 変更: トースト
-        const toast = document.getElementById('toast');
-        const toastMessage = document.getElementById('toast-message');
-        const toastClose = document.getElementById('toast-close');
-        const toastCopy = document.getElementById('toast-copy');
-
-        // [新規追加] パスワードモーダル (依頼①)
-        const passwordModal = document.getElementById('password-modal');
-        const passwordForm = document.getElementById('password-form');
-        const passwordInput = document.getElementById('password-input');
-        const passwordError = document.getElementById('password-error');
-        const passwordSubmit = document.getElementById('password-submit');
-
-
-        // --- INITIALIZATION ---
-        document.addEventListener('DOMContentLoaded', () => {
-            initViewport(); // [新規追加] (依頼③)
-            checkAuth(); // [新規追加] (依頼①)
-            initDB();
-            initSidebar();
-            initStyles();
-            initListeners();
-            loadHistory();
-        });
-        
-        // --- [新規追加] Viewport Height (依頼③) ---
-        /**
-         * スマホのブラウザUI（検索バー）による高さ変動に対応
-         * body の高さを window.innerHeight に動的に設定する
-         */
-        function initViewport() {
-            const setVh = () => {
-                // window.innerHeight を取得して body の高さに設定
-                document.body.style.height = `${window.innerHeight}px`;
-            };
-            
-            setVh(); // 初期実行
-            
-            // リサイズイベント（回転、UIの表示/非表示）に対応
-            window.addEventListener('resize', setVh);
-        }
-        
-        // --- [新規追加] Authentication (依頼①) ---
-        /**
-         * sessionStorage を確認し、未認証ならモーダルを表示
-         */
-        function checkAuth() {
-            if (sessionStorage.getItem('muGenAuth') === 'true') {
-                console.log("Already authenticated.");
-            } else {
-                // 未認証の場合、モーダルを表示
-                passwordModal.classList.add('flex');
-                passwordInput.focus();
-            }
-        }
-
-        /**
-         * パスワードフォーム送信時の処理
-         */
-        async function handlePasswordSubmit(event) {
-            event.preventDefault();
-            const password = passwordInput.value;
-            if (!password) return;
-
-            // ボタンをローディング状態に
-            passwordSubmit.disabled = true;
-            passwordSubmit.textContent = 'Checking...';
-            passwordError.textContent = ''; // エラーをクリア
-
-            try {
-                const response = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'authenticate',
-                        password: password
-                    })
-                });
-
-                if (response.ok) {
-                    // 認証成功
-                    sessionStorage.setItem('muGenAuth', 'true');
-                    passwordModal.classList.remove('flex');
-                    showToast("Authentication successful", "success");
+        let response;
+        switch (action) {
+            case 'translate':
+                // 翻訳はデフォルトキー (GEMINI_API_KEY_XX) を使用
+                const translateApiKey = getApiKey(context, 'default', keyIndex);
+                response = await handleTranslate(data, translateApiKey);
+                break;
+            case 'generate':
+                if (model === 'imagen-3.0-generate') {
+                    response = await handleGenerate(data, apiKey, context);
+                } else if (model === 'gemini-2.5-flash-image-preview') {
+                    // Gemini Flash Image も 'generate' アクションとして扱われる (編集モードでない場合)
+                    response = await handleEdit(data, apiKey, context); // 編集用関数を流用
                 } else {
-                    // 認証失敗
-                    const data = await response.json();
-                    throw new Error(data.error || 'Authentication failed');
+                    response = new Response(JSON.stringify({ error: 'Invalid model for generation' }), { status: 400 });
                 }
-
-            } catch (error) {
-                console.error("Auth error:", error);
-                passwordError.textContent = error.message;
-            } finally {
-                // ボタンの状態を元に戻す
-                passwordSubmit.disabled = false;
-                passwordSubmit.textContent = 'Unlock';
-            }
-        }
-
-
-        // --- (Omitted: IndexedDB functions for brevity) ---
-        function initDB() {
-            // ... (変更なし)
-            const request = indexedDB.open("muGenDB", 1);
-
-            request.onerror = (event) => {
-                console.error("IndexedDB error:", event.target.errorCode);
-                showToast("Database error. History may not work.", "error");
-            };
-
-            request.onupgradeneeded = (event) => {
-                db = event.target.result;
-                const objectStore = db.createObjectStore("images", { keyPath: "id", autoIncrement: true });
-                objectStore.createIndex("timestamp", "timestamp", { unique: false });
-                objectStore.createIndex("prompt", "prompt", { unique: false });
-                // ★ 追加: モデル情報を保存するインデックス
-                objectStore.createIndex("model", "model", { unique: false });
-                // ★ 追加: アスペクト比とスタイル
-                objectStore.createIndex("aspectRatio", "aspectRatio", { unique: false });
-                objectStore.createIndex("styles", "styles", { unique: false });
-            };
-
-            request.onsuccess = (event) => {
-                db = event.target.result;
-                console.log("IndexedDB initialized.");
-            };
-        }
-
-        // ★ 変更: モデル情報、アスペクト比、スタイルを保存
-        function saveImageToDB(prompt, translatedPrompt, base64Data, model, aspectRatio, styles) {
-            // ... (変更なし)
-            if (!db) return;
-            const transaction = db.transaction(["images"], "readwrite");
-            const objectStore = transaction.objectStore("images");
-            const newItem = {
-                prompt: prompt,
-                translatedPrompt: translatedPrompt,
-                base64: base64Data,
-                timestamp: new Date().getTime(),
-                model: model, // ★ モデル情報を保存
-                aspectRatio: aspectRatio, // ★ アスペクト比を保存
-                styles: styles // ★ スタイル(配列)を保存
-            };
-            const request = objectStore.add(newItem);
-
-            request.onsuccess = () => {
-                console.log("Image saved to DB");
-                loadHistory(); // Refresh history
-            };
-            request.onerror = (event) => {
-                console.error("Error saving to DB:", event.target.error);
-                if (event.target.error.name === 'QuotaExceededError') {
-                    showToast("History storage is full. Clearing old entries...", "warning");
-                    clearOldHistory();
-                }
-            };
-        }
-
-        // ★ 変更: 統計情報を計算して表示 + マーキー情報
-        function loadHistory() {
-            // ... (変更なし)
-            if (!db) return;
-            const transaction = db.transaction(["images"], "readonly");
-            const objectStore = transaction.objectStore("images");
-            const index = objectStore.index("timestamp");
-            const request = index.getAll(null, 500); // 履歴の最大数を増やす (500)
-
-            request.onsuccess = () => {
-                const items = request.result.reverse(); // Newest first
-                historyContainer.innerHTML = "";
-                
-                let totalCostUSD = 0;
-                
-                if (items.length === 0) {
-                    historyContainer.innerHTML = '<p class="text-gray-400 text-sm">No generated images yet.</p>';
+                break;
+            case 'edit':
+                 if (model === 'gemini-2.5-flash-image-preview') {
+                    response = await handleEdit(data, apiKey, context);
                 } else {
-                    items.forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = "cursor-pointer rounded-lg overflow-hidden relative group";
-                        
-                        // ★ 変更: History項目にマーキー情報と編集ボタンを追加
-                        
-                        // 表示する情報テキストを作成
-                        let infoParts = [
-                            `[P] ${item.prompt || ''}`,
-                            `[M] ${item.model || 'unknown'}`,
-                            `[A] ${item.aspectRatio || 'N/A'}`
-                        ];
-                        if (item.styles && item.styles.length > 0) {
-                            infoParts.push(`[S] ${item.styles.join(', ')}`);
-                        }
-                        // テキストを区切り文字で連結 (HTMLエスケープは不要、innerHTMLで解釈される)
-                        const infoText = infoParts.join(' &nbsp;&nbsp;|&nbsp;&nbsp; ');
-
-                        div.innerHTML = `
-                            <img src="${item.base64}" alt="History thumbnail" class="w-full h-auto object-cover">
-                            
-                            <!-- ★ 変更: ホバー時のオーバーレイ (中央にボタン) -->
-                            <div class="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
-                                <button class="text-xs bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded" data-base64="${item.base64.split(',')[1]}" data-prompt="${item.prompt}">
-                                    Edit
-                                </button>
-                            </div>
-
-                            <!-- ★ 追加: マーキーコンテナ -->
-                            <div class="history-info-container">
-                                <div class="history-info-text-wrapper">
-                                    <span class="history-info-text">${infoText}</span>
-                                    <span class="history-info-text">${infoText}</span> <!-- テキストを2回繰り返す -->
-                                </div>
-                            </div>
-                        `;
-                        
-                        // モーダルを開く (機能3)
-                        div.querySelector('img').addEventListener('click', () => showImageInModal(item.base64, item.prompt, item.translatedPrompt, item.base64.split(',')[1]));
-                        
-                        // HistoryのEditボタン
-                        div.querySelector('button').addEventListener('click', (e) => {
-                            e.stopPropagation(); // 親のクリックイベントを発火させない
-                            const base64 = e.currentTarget.dataset.base64;
-                            const prompt = e.currentTarget.dataset.prompt;
-                            loadUploadedImage(`data:image/png;base64,${base64}`, prompt);
-                        });
-
-                        historyContainer.appendChild(div);
-
-                        // ★ 料金計算
-                        if (item.model === 'imagen-3.0-generate') {
-                            totalCostUSD += PRICE_IMAGEN_USD;
-                        } else if (item.model === 'gemini-2.5-flash-image-preview') {
-                            totalCostUSD += PRICE_GEMINI_FLASH_IMAGE_USD;
-                        } else {
-                            // モデル情報がない古いデータ (仮にImagen扱い)
-                            totalCostUSD += PRICE_IMAGEN_USD;
-                        }
-                    });
+                    response = new Response(JSON.stringify({ error: 'Invalid model for editing' }), { status: 400 });
                 }
-
-                // ★ 統計表示を更新
-                statsTotalImages.textContent = items.length;
-                statsCostUsd.textContent = `$${totalCostUSD.toFixed(3)}`; // 小数点以下3桁
-                statsCostJpy.textContent = `¥${Math.round(totalCostUSD * USD_JPY_RATE)}`;
-            };
+                break;
+            default:
+                response = new Response(JSON.stringify({ error: 'Invalid action' }), { status: 400 });
         }
-        
-        function clearOldHistory() {
-            // ... (変更なし)
-            if (!db) return;
-            const transaction = db.transaction(["images"], "readwrite");
-            const objectStore = transaction.objectStore("images");
-            objectStore.clear().onsuccess = () => {
-                showToast("Old history cleared.", "success");
-                loadHistory();
-            };
+        return response;
+
+    } catch (error) {
+        console.error("Server Error:", error);
+        // ★ 変更: サーバー側での予期せぬエラーもGASに記録
+        try {
+            const data = await context.request.json().catch(() => ({})); // ボディ取得試行
+            await handleErrorLog({
+                prompt: data.prompt || "N/A",
+                model: data.model || "N/A",
+                error: `Server Error: ${error.message}`
+            }, context);
+        } catch (logError) {
+            console.error("Failed to log server error to GAS:", logError);
         }
+        return new Response(JSON.stringify({ error: error.message || 'An unexpected error occurred' }), { status: 500 });
+    }
+}
 
-        // --- UI INITIALIZATION ---
+// --- [新規追加] 認証ハンドラー (依頼①) ---
+/**
+ * Handles password authentication
+ */
+async function handleAuthenticate(data, context) {
+    const { password } = data;
+    // Cloudflareの環境変数から正しいパスワードを取得
+    const correctPassword = context.env.APP_PASSWORD;
 
-        // ★ 変更: サイドバートグルロジック (PC/スマホ共通)
-        function initSidebar() {
-            // ... (変更なし)
-            sidebarToggleButton.addEventListener('click', () => {
-                // サイドバーが開いているか (translate-x-full が *ない* か)
-                const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
+    if (!correctPassword) {
+        console.error("APP_PASSWORD environment variable is not set.");
+        return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 500 });
+    }
 
-                if (isSidebarOpen) {
-                    // 閉じる
-                    sidebar.classList.add('-translate-x-full');
-                    sidebar.classList.remove('md:translate-x-0'); // PC用の表示クラスも削除
-                    mainContent.classList.remove('md:ml-64'); // PC用のマージン削除
-                } else {
-                    // 開く
-                    sidebar.classList.remove('-translate-x-full');
-                    sidebar.classList.add('md:translate-x-0'); // PC用の表示クラス追加
-                    mainContent.classList.add('md:ml-64'); // PC用のマージン追加
-                }
-            });
-            
-            // スマホ用クローズボタン (変更なし)
-            closeSidebarBtn.addEventListener('click', () => {
-                sidebar.classList.add('-translate-x-full');
-            });
-        }
+    if (password === correctPassword) {
+        // 認証成功
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+    } else {
+        // 認証失敗
+        return new Response(JSON.stringify({ error: 'Invalid password' }), { status: 401 });
+    }
+}
+// ----------------------------------------
 
-        function initStyles() {
-            // ... (変更なし)
-            const container = document.getElementById('styles-container');
-            STYLES.forEach(style => {
-                const div = document.createElement('div');
-                div.className = ""; 
-                div.innerHTML = `
-                    <input type="checkbox" id="style-${style}" value="${style}" class="hidden style-checkbox">
-                    <label for="style-${style}" class="cursor-pointer bg-gray-700 text-gray-300 border border-gray-600 rounded-full px-4 py-2 text-sm font-medium hover:bg-gray-600 transition">
-                        ${style}
-                    </label>
-                `;
-                container.appendChild(div);
-            });
-        }
 
-        // --- EVENT LISTENERS ---
-        function initListeners() {
-            generationForm.addEventListener('submit', handleGenerationSubmit);
-            translateButton.addEventListener('click', handleTranslate);
-            
-            // ★ 追加: プロンプトボタンリスナー
-            promptCopyButton.addEventListener('click', handlePromptCopy);
-            promptClearButton.addEventListener('click', handlePromptClear);
-            
-            modalClose.addEventListener('click', () => imageModal.classList.remove('flex'));
-            modalCopy.addEventListener('click', handleModalCopy);
-            modalRegenerate.addEventListener('click', handleModalRegenerate);
-            modalEdit.addEventListener('click', handleModalEdit); // ★ 追加
-            
-            editButton.addEventListener('click', () => toggleEditMode(true)); 
-            closeImageButton.addEventListener('click', closeImage); // ★ 追加
-            
-            // ★ 追加: トーストボタン
-            toastClose.addEventListener('click', () => hideToast());
-            toastCopy.addEventListener('click', () => copyToastMessage());
+// --- Action Handlers ---
 
-            modelSelect.addEventListener('change', () => {
-                // ... (変更なし)
-                if (modelSelect.value === 'imagen-3.0-generate' && isEditingMode) {
-                    toggleEditMode(false);
-                }
-                if (modelSelect.value === 'gemini-2.5-flash-image-preview' && currentEditImageBase64) {
-                    toggleEditMode(true);
-                }
-            });
-            
-            autoRetrySelect.addEventListener('change', () => {
-                // ... (変更なし)
-                if(autoRetrySelect.value === '-1') {
-                    const customRetry = prompt("Enter number of retries:", "15");
-                    if (customRetry && !isNaN(parseInt(customRetry))) {
-                        const val = parseInt(customRetry);
-                        const newOption = new Option(`${val} Times (Custom)`, val, true, true);
-                        autoRetrySelect.add(newOption);
-                    } else {
-                        autoRetrySelect.value = '0'; // Reset
-                    }
-                }
-            });
+/**
+ * Translates text to English using Gemini Flash
+ */
+async function handleTranslate(data, apiKey) {
+    // ... (変更なし)
+    const { prompt } = data;
+    if (!prompt) {
+        return new Response(JSON.stringify({ error: 'Prompt is required' }), { status: 400 });
+    }
 
-            stylesToggleBtn.addEventListener('click', toggleStylesAccordion);
-            promptInput.addEventListener('keydown', handlePromptKeydown);
+    const systemPrompt = "You are a translation assistant. Translate the following text into a clear, effective, and creative English prompt for an AI image generator. If the input is already in English, refine it for clarity and creative potential.";
+    const userQuery = `Translate and refine: "${prompt}"`;
+    const apiUrl = `${GEMINI_API_URL_FLASH}?key=${apiKey}`;
 
-            // ★ 追加: ドラッグ＆ドロップリスナー
-            imageDisplay.addEventListener('dragover', handleDragOver);
-            imageDisplay.addEventListener('dragleave', handleDragLeave);
-            imageDisplay.addEventListener('drop', handleDrop);
+    const payload = {
+        contents: [{ parts: [{ text: userQuery }] }],
+        systemInstruction: {
+            parts: [{ text: systemPrompt }]
+        },
+    };
 
-            // ★ 追加: ファイルアップロードリスナー
-            uploadImageButton.addEventListener('click', () => uploadImageInput.click());
-            uploadImageInput.addEventListener('change', handleFileSelect);
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
 
-            // [新規追加] パスワードフォームリスナー (依頼①)
-            passwordForm.addEventListener('submit', handlePasswordSubmit);
-            
-            // [新規追加] スワイプコントロールリスナー (依頼②)
-            initSwipeControls();
-        }
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Translate API Error:", errorText);
+        return new Response(JSON.stringify({ error: 'Failed to translate' }), { status: 500 });
+    }
 
-        // --- [新規追加] Swipe Controls (依頼②) ---
-        function initSwipeControls() {
-            document.addEventListener('touchstart', handleTouchStart, { passive: true });
-            document.addEventListener('touchmove', handleTouchMove, { passive: true });
-            document.addEventListener('touchend', handleTouchEnd, { passive: true });
-        }
+    const result = await response.json();
+    const translatedPrompt = result.candidates[0].content.parts[0].text;
+    
+    return new Response(JSON.stringify({ translatedPrompt }), {
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
 
-        function handleTouchStart(e) {
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-            touchCurrentX = touchStartX;
-        }
+/**
+ * Generates an image using Imagen 3.0
+ */
+async function handleGenerate(data, apiKey, context) {
+    // ... (変更なし)
+    const { prompt, aspectRatio, styles, model } = data;
 
-        function handleTouchMove(e) {
-            // スワイプ中のX座標を記録 (Y座標は touchend で比較)
-            touchCurrentX = e.touches[0].clientX;
-        }
+    // Enhance prompt
+    let enhancedPrompt = prompt;
+    if (styles && styles.length > 0) {
+        enhancedPrompt += `, ${styles.join(', ')} style`;
+    }
 
-        function handleTouchEnd(e) {
-            const touchEndX = e.changedTouches[0].clientX;
-            const touchEndY = e.changedTouches[0].clientY;
-            
-            const deltaX = touchEndX - touchStartX;
-            const deltaY = touchEndY - touchStartY;
-
-            // 上下スクロールを優先 (Yの移動量がXより大きい場合はスワイプとみなさない)
-            if (Math.abs(deltaY) > Math.abs(deltaX)) {
-                return;
-            }
-
-            const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
-
-            // 1. 左端からの右スワイプ (サイドバーを開く)
-            // (開始位置が画面の左端 50px 以内、かつ 50px 以上右にスワイプ)
-            if (touchStartX < 50 && deltaX > 50 && !isSidebarOpen) {
-                sidebar.classList.remove('-translate-x-full');
-            }
-
-            // 2. サイドバーが開いているときの左スワイプ (サイドバーを閉じる)
-            // (50px 以上左にスワイプ)
-            if (isSidebarOpen && deltaX < -50) {
-                sidebar.classList.add('-translate-x-full');
+    const apiUrl = `${IMAGEN_API_URL_PREDICT}?key=${apiKey}`;
+    
+    const payload = {
+        instances: {
+            prompt: enhancedPrompt
+        },
+        parameters: {
+            "aspectRatio": aspectRatio, 
+            "sampleCount": 1,
+            "safetySettings": {
+                "violence": "BLOCK_NONE",
+                "sexual": "BLOCK_NONE",
+                "hate": "BLOCK_NONE",
+                "dangerous": "BLOCK_NONE"
             }
         }
-        
-        // --- CORE LOGIC ---
+    };
 
-        function toggleStylesAccordion() {
-            // ... (変更なし)
-            stylesContainer.classList.toggle('hidden');
-            stylesChevron.classList.toggle('rotate-180');
-        }
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
 
-        function handlePromptKeydown(event) {
-            // ... (変更なし)
-            if (isMobile) {
-                return; // モバイルでは無効
-            }
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault(); 
-                const now = new Date().getTime();
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Imagen API Error:", errorText);
+        await handleErrorLog({ prompt: enhancedPrompt, model: model, error: `Imagen API Error: ${errorText}` }, context);
+        return new Response(JSON.stringify({ error: `Failed to generate image (Imagen): ${errorText}` }), { status: 500 });
+    }
 
-                if (now - lastEnterPress < 500) {
-                    handleGenerationSubmit(new Event('submit'));
-                    lastEnterPress = 0; 
-                } else {
-                    lastEnterPress = now;
-                    showToast("Press Enter again to send", "info"); 
-                    setTimeout(() => {
-                        if (lastEnterPress === now) {
-                            lastEnterPress = 0;
-                        }
-                    }, 500); 
-                }
-            } else if (event.key !== 'Enter') {
-                lastEnterPress = 0;
-            }
-        }
+    const result = await response.json();
+    const base64 = result.predictions[0].bytesBase64Encoded;
 
-        // ★ 追加: 画像クローズ処理
-        function closeImage() {
-            // ... (変更なし)
-            generatedImage.src = "";
-            generatedImage.classList.add('hidden');
-            placeholder.style.display = 'flex'; // 'flex'に戻す
-            editButton.classList.add('hidden');
-            closeImageButton.classList.add('hidden');
-            currentEditImageBase64 = null;
-            if (isEditingMode) {
-                toggleEditMode(false);
-            }
-        }
-
-        // ★ 変更: 編集モードインジケーター制御 + ツールバー制御
-        function toggleEditMode(forceOn) { 
-            // ... (変更なし)
-            isEditingMode = forceOn;
-            
-            if (isEditingMode) {
-                if (!currentEditImageBase64) {
-                    showToast("No image to edit. Generate or upload an image first.", "warning");
-                    isEditingMode = false;
-                    return;
-                }
-                modelSelect.value = 'gemini-2.5-flash-image-preview';
-                promptInput.placeholder = "Enter edit instructions (e.g., 'make the sky blue', 'add a hat')...";
-                
-                // ★ 変更: ツールバーの項目を個別に制御
-                optionsToolbar.style.display = 'flex'; // ツールバー自体は表示
-                modelSelectGroup.style.display = 'none'; // モデル選択は隠す
-                autoRetryGroup.style.display = 'none'; // リトライも隠す
-                // ★ 修正: Gemini編集モードではアスペクト比は非表示 (APIがサポートしていないため)
-                aspectRatioGroup.style.display = 'none'; 
-                
-                imageDisplay.classList.add('ring-4', 'ring-indigo-500');
-                if (!stylesContainer.classList.contains('hidden')) {
-                    toggleStylesAccordion();
-                }
-                editModeIndicator.classList.remove('hidden'); // ★ インジケーター表示
-            } else {
-                modelSelect.value = 'imagen-3.0-generate';
-                promptInput.placeholder = "Enter your prompt... (Non-English will be translated)";
-
-                // ★ 変更: ツールバーの項目を全て表示
-                optionsToolbar.style.display = 'flex';
-                modelSelectGroup.style.display = 'block';
-                autoRetryGroup.style.display = 'block';
-                aspectRatioGroup.style.display = 'block';
-
-                imageDisplay.classList.remove('ring-4', 'ring-indigo-500');
-                editModeIndicator.classList.add('hidden'); // ★ インジケーター非表示
-            }
-            // ★ ボタンアイコンを更新
-            setLoading(generateButton, false);
-        }
-
-        async function handleTranslate() {
-            // ... (変更なし)
-            const prompt = promptInput.value;
-            if (!prompt) {
-                showToast("Please enter text to translate", "warning");
-                return;
-            }
-            setLoading(translateButton, true);
-            try {
-                // ★ 変更: 翻訳キャンセル用の AbortController
-                const controller = new AbortController();
-                // 翻訳ボタン自体をキャンセル可能にはしないが、万が一のタイムアウト用
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒タイムアウト
-
-                const response = await fetchWithRetry('/api/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'translate',
-                        prompt: prompt
-                    })
-                }, 0, controller.signal); // リトライなし、signalあり
-
-                clearTimeout(timeoutId); // タイムアウト解除
-
-                const data = await response.json();
-                if (response.ok) {
-                    promptInput.value = data.translatedPrompt;
-                    showToast("Translation successful", "success");
-                } else {
-                    throw new Error(data.error || "Translation failed");
-                }
-            } catch (error) {
-                console.error("Translate error:", error);
-                if (error.name !== 'AbortError') {
-                    showToast(error.message, "error");
-                } else {
-                    showToast("Translation timed out.", "error");
-                }
-            } finally {
-                setLoading(translateButton, false);
-            }
-        }
-
-        // ★ 変更: キャンセル機能 + エラー時のGAS送信
-        async function handleGenerationSubmit(event) {
-            // ... (変更なし)
-            if (event) event.preventDefault(); 
-            
-            // ★ キャンセルロジック
-            if (generationInProgress) {
-                if (currentFetchController) {
-                    currentFetchController.abort();
-                    showToast("Generation cancelled", "info");
-                }
-                // setLoading, generationInProgress のリセットは fetch の finally で行う
-                return;
-            }
-
-            const prompt = promptInput.value;
-            if (!prompt) {
-                showToast("Please enter a prompt", "warning");
-                return;
-            }
-
-            // ★ 編集モードでベース画像がない場合のエラー
-            if (isEditingMode && !currentEditImageBase64) {
-                 showToast("No image loaded for editing. Please upload or generate an image.", "warning");
-                 toggleEditMode(false); // 編集モードを解除
-                 return;
-            }
-
-            generationInProgress = true;
-            currentFetchController = new AbortController(); // ★ AbortController を新規作成
-            setLoading(generateButton, true); // ★ アイコンを Stop に変更
-            loadingAnimation.classList.add('active');
-            placeholder.style.display = 'none';
-            generatedImage.classList.add('hidden');
-            editButton.classList.add('hidden');
-            closeImageButton.classList.add('hidden'); // ★ 生成中は非表示
-
-            const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value);
-            const model = modelSelect.value; 
-            apiKeyCounter++; 
-            
-            const payload = {
-                action: isEditingMode ? 'edit' : 'generate',
-                prompt: prompt,
-                model: model, 
-                keyIndex: apiKeyCounter, 
-                aspectRatio: aspectRatioSelect.value, // ★ 編集モードでも送信するが、サーバー側 (generate.js) で無視される
-                styles: selectedStyles,
-                baseImage: isEditingMode ? currentEditImageBase64 : null
-            };
-
-            const retryCount = parseInt(autoRetrySelect.value, 10);
-
-            try {
-                const response = await fetchWithRetry('/api/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }, retryCount, currentFetchController.signal); // ★ signal を渡す
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    const base64 = `data:image/png;base64,${data.base64}`;
-                    generatedImage.src = base64;
-                    generatedImage.classList.remove('hidden');
-                    
-                    currentEditImageBase64 = data.base64; // Save for editing
-                    
-                    // ★ 変更: モデル情報、アスペクト比、スタイルを渡す
-                    saveImageToDB(prompt, data.translatedPrompt || prompt, base64, model, aspectRatioSelect.value, selectedStyles); 
-                    showToast(isEditingMode ? "Edit successful" : "Generation successful", "success");
-                    editButton.classList.remove('hidden');
-                    closeImageButton.classList.remove('hidden'); // ★ 表示
-                    
-                    // ★ 変更: 編集成功後、自動で編集モードを継続
-                    if (!isEditingMode) {
-                         // もし（アップロードなどで）編集モードになっていなかったら、
-                         // 編集可能なモデルで生成した場合は編集モードに入る
-                         if (model === 'gemini-2.5-flash-image-preview') {
-                            toggleEditMode(true);
-                         }
-                    }
-
-                    // ★ 追加: 生成成功後、プロンプトをクリア
-                    if (!isEditingMode) { // 編集モードの時はクリアしない
-                        promptInput.value = "";
-                    }
-                    
-                } else {
-                    throw new Error(data.error || "Generation failed");
-                }
-
-            } catch (error) {
-                console.error("Generation error:", error);
-                if (error.name === 'AbortError') {
-                    console.log("Fetch aborted by user.");
-                } else {
-                    showToast(error.message, "error");
-                    
-                    // ★ 追加: フロントエンドでのエラーもGASに送信
-                    sendErrorToGAS(payload, error.message);
-                }
-                // ★ キャンセル時やエラー時でもプレースホルダーに戻さない (前回の画像が残るようにする)
-                if (!currentEditImageBase64) {
-                    placeholder.style.display = 'flex';
-                } else {
-                    generatedImage.classList.remove('hidden');
-                    editButton.classList.remove('hidden');
-                    closeImageButton.classList.remove('hidden');
-                }
-            } finally {
-                setLoading(generateButton, false); // ★ アイコンを元に戻す
-                loadingAnimation.classList.remove('active');
-                generationInProgress = false; // ★ ステートをリセット
-                currentFetchController = null;
-            }
-        }
-        
-        // ★ 変更: AbortSignal を引数に追加
-        async function fetchWithRetry(url, options, retries = 0, signal = null) {
-            // ... (変更なし)
-            let attempt = 0;
-            const maxRetries = retries < 0 ? 0 : retries; 
-
-            // ★ signal を options に追加
-            if (signal) {
-                options.signal = signal;
-            }
-
-            while (attempt <= maxRetries) {
-                try {
-                    if (attempt > 0) {
-                        showToast(`Retrying... (Attempt ${attempt} of ${maxRetries})`, "warning");
-                    }
-                    const response = await fetch(url, options);
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({ error: `Server error: ${response.status}` }));
-                        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-                    }
-                    return response; 
-                } catch (error) {
-                    // ★ AbortError はリトライしない
-                    if (error.name === 'AbortError') {
-                        throw error;
-                    }
-                    console.warn(`Attempt ${attempt} failed:`, error.message);
-                    if (attempt === maxRetries) {
-                        throw error; 
-                    }
-                    attempt++;
-                    await new Promise(res => setTimeout(res, 1000 * attempt)); 
-                }
-            }
-        }
-
-        // ★ 追加: エラーをGASに送信する（サイレント）
-        function sendErrorToGAS(payload, errorMessage) {
-            // ... (変更なし)
-            fetch('/api/generate', {
+    // --- Asynchronously save to GAS ---
+    const gasUrl = context.env.GAS_WEB_APP_URL;
+    if (gasUrl) {
+        const saveData = {
+            prompt: prompt,
+            translatedPrompt: enhancedPrompt, 
+            base64Data: base64,
+            model: model 
+        };
+        context.waitUntil(
+            fetch(gasUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'logError',
-                    prompt: payload.prompt,
-                    model: payload.model,
-                    error: errorMessage
-                })
-            }).catch(err => {
-                console.warn("Failed to log error to GAS:", err);
-            });
-        }
+                body: JSON.stringify(saveData)
+            }).catch(err => console.error("GAS save error:", err))
+        );
+    }
+    // ---------------------------------
 
+    return new Response(JSON.stringify({ base64: base64, translatedPrompt: enhancedPrompt }), {
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
 
-        // --- ★ 追加: プロンプト入力用ヘルパー ---
+/**
+ * Edits (or generates) an image using Gemini 2.5 Flash Image
+ */
+async function handleEdit(data, apiKey, context) {
+    // ... (変更なし)
+    const { prompt, baseImage, aspectRatio, model } = data; 
+    
+    const isEditMode = !!baseImage;
 
-        function handlePromptCopy() {
-            // ... (変更なし)
-            const textToCopy = promptInput.value;
-            if (!textToCopy) {
-                showToast("Nothing to copy", "info");
-                return;
+    const apiUrl = `${GEMINI_API_URL_FLASH_IMAGE}?key=${apiKey}`;
+    
+    const userParts = [{ text: prompt }];
+    
+    if (isEditMode) {
+        userParts.push({
+            inlineData: {
+                mimeType: "image/png",
+                data: baseImage
             }
-            // クリップボードコピー
-            copyToClipboard(textToCopy, "Prompt copied to clipboard!");
-        }
+        });
+    }
 
-        function handlePromptClear() {
-            // ... (変更なし)
-            promptInput.value = "";
-            showToast("Input cleared", "info");
-        }
-
-
-        // --- MODAL & TOAST functions ---
-        
-        // ★ 変更: base64 (raw) もデータセットに保存
-        function showImageInModal(base64DataUrl, prompt, translatedPrompt, rawBase64) {
-            // ... (変更なし)
-            modalImage.src = base64DataUrl;
-            modalPrompt.textContent = translatedPrompt || prompt;
-            modalRegenerate.dataset.prompt = prompt;
-            modalRegenerate.dataset.translatedPrompt = translatedPrompt;
-            modalEdit.dataset.base64 = rawBase64; // ★ Raw Base64
-            modalEdit.dataset.prompt = prompt; // ★ 元のプロンプト
-            imageModal.classList.add('flex');
-        }
-        
-        // ★ 変更: クリップボードコピーのFallbackを改善
-        function handleModalCopy() {
-            // ... (変更なし)
-            const textToCopy = modalPrompt.textContent;
-            copyToClipboard(textToCopy, "Prompt copied to clipboard!");
-        }
-        
-        function handleModalRegenerate() {
-            // ... (変更なし)
-            const prompt = modalRegenerate.dataset.prompt;
-            promptInput.value = prompt;
-            imageModal.classList.remove('flex');
-            if (isEditingMode) {
-                toggleEditMode(false);
+    const payload = {
+        contents: [
+            {
+                role: "user",
+                parts: userParts
             }
-            handleGenerationSubmit(new Event('submit')); 
+        ],
+        generationConfig: {
+            responseModalities: ['TEXT', 'IMAGE']
+        },
+        safetySettings: [
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+        ]
+    };
+
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Gemini Edit API Error:", errorText);
+        await handleErrorLog({ prompt: prompt, model: model, error: `Gemini API Error: ${errorText}` }, context);
+        return new Response(JSON.stringify({ error: `Failed to edit image (Gemini): ${errorText}` }), { status: 500 });
+    }
+
+    const result = await response.json();
+    const base64 = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+
+    if (!base64) {
+        console.error("Gemini Edit API Error: No image data in response", result);
+        const errorText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        let errorMessage;
+        if (result?.candidates?.[0]?.finishReason === 'SAFETY') {
+             errorMessage = `Edit failed: Image blocked due to safety settings.`;
+        } else {
+             errorMessage = `Edit failed: ${errorText || 'No image data returned'}`;
         }
+        await handleErrorLog({ prompt: prompt, model: model, error: errorMessage }, context);
+        return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
+    }
 
-        // ★ 追加: モーダルからの編集
-        function handleModalEdit() {
-            // ... (変更なし)
-            const base64 = modalEdit.dataset.base64;
-            const prompt = modalEdit.dataset.prompt;
-            loadUploadedImage(`data:image/png;base64,${base64}`, prompt);
-            imageModal.classList.remove('flex');
-        }
+    // --- Asynchronously save to GAS ---
+    const gasUrl = context.env.GAS_WEB_APP_URL;
+    if (gasUrl) {
+        const gasPrompt = isEditMode ? `[Edit] ${prompt}` : prompt;
+        const saveData = {
+            prompt: gasPrompt,
+            translatedPrompt: gasPrompt,
+            base64Data: base64,
+            model: model 
+        };
+        context.waitUntil(
+            fetch(gasUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(saveData)
+            }).catch(err => console.error("GAS save error:", err))
+        );
+    }
+    // ---------------------------------
 
-        // ★ 変更: showToast (エラー時は自動で消えない)
-        function showToast(message, type = "success") {
-            // ... (変更なし)
-            if (toastTimeoutId) {
-                clearTimeout(toastTimeoutId);
-                toastTimeoutId = null;
-            }
-            
-            toastMessage.textContent = message;
-            toast.className = `fixed top-20 right-6 text-white py-3 px-4 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50`; // Reset
-            
-            if (type === "error") {
-                toast.classList.add('bg-red-600');
-                toastCopy.classList.remove('hidden'); // エラー時のみコピーボタン表示
-            } else {
-                toast.classList.add(type === "warning" ? 'bg-yellow-500' : (type === "info" ? 'bg-blue-600' : 'bg-green-600'));
-                toastCopy.classList.add('hidden');
-            }
+    return new Response(JSON.stringify({ base64: base64, translatedPrompt: prompt }), {
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
 
-            toast.classList.remove('opacity-0', '-translate-y-10');
-            toast.classList.add('opacity-100', 'translate-y-0');
+/**
+ * ★ 追加: エラーをGASに送信する
+ */
+async function handleErrorLog(data, context) {
+    // ... (変更なし)
+    const { prompt, model, error } = data;
+    const gasUrl = context.env.GAS_WEB_APP_URL;
 
-            // ★ エラーでない場合のみ、3秒後に自動で消す
-            if (type !== "error") {
-                toastTimeoutId = setTimeout(() => {
-                    hideToast();
-                }, 3000); 
-            }
-        }
+    if (!gasUrl) {
+        console.warn("GAS_WEB_APP_URL not set. Skipping error logging.");
+        return new Response(JSON.stringify({ success: true, message: "GAS URL not set" }), { status: 200 });
+    }
 
-        // ★ 追加: トーストを隠す
-        function hideToast() {
-            // ... (変更なし)
-            if (toastTimeoutId) {
-                clearTimeout(toastTimeoutId);
-                toastTimeoutId = null;
-            }
-            toast.classList.remove('opacity-100', 'translate-y-0');
-            toast.classList.add('opacity-0', '-translate-y-10');
-        }
-        
-        // ★ 追加: トーストメッセージをコピー
-        function copyToastMessage() {
-            // ... (変更なし)
-            const textToCopy = toastMessage.textContent;
-            copyToClipboard(textToCopy, "Error message copied!");
-        }
+    const errorData = {
+        prompt: `[ERROR] ${prompt || 'N/A'}`,
+        translatedPrompt: error, // エラーメッセージをここに
+        base64Data: "ERROR_LOG", // 識別子
+        model: model || 'N/A'
+    };
 
-        // ★ 汎用コピー関数
-        function copyToClipboard(textToCopy, successMessage) {
-             // ... (変更なし)
-             navigator.clipboard.writeText(textToCopy).then(() => {
-                showToast(successMessage, "success");
-            }).catch(err => {
-                console.error('Clipboard copy failed:', err);
-                try {
-                    // Fallback for insecure contexts
-                    const textArea = document.createElement("textarea");
-                    textArea.value = textToCopy;
-                    textArea.style.position = "fixed"; 
-                    textArea.style.top = "0";
-                    textArea.style.left = "0";
-                    document.body.appendChild(textArea);
-                    textArea.focus();
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                    showToast(successMessage, "success");
-                } catch (fallbackErr) {
-                    console.error('Fallback copy failed:', fallbackErr);
-                    showToast("Failed to copy", "error");
-                }
-            });
-        }
-        
-        // ★ 変更: アイコン切り替え (isEditingMode 対応)
-        function setLoading(button, isLoading) {
-            // ... (変更なし)
-            if (button.id === 'generate-button') {
-                const icon = button.querySelector('svg use');
-                if (isLoading) {
-                    button.disabled = false; // ★ キャンセルのため
-                    button.classList.add('bg-red-600', 'hover:bg-red-700'); // ★ 停止ボタンの色
-                    button.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-                    if (icon) icon.setAttribute('href', '#icon-stop');
-                    button.dataset.tooltip = "Cancel Generation";
-                } else {
-                    button.disabled = false;
-                    button.classList.remove('bg-red-600', 'hover:bg-red-700');
-                    button.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-                    
-                    // ★ 変更: isEditingMode に応じてアイコンを切り替え
-                    if (isEditingMode) {
-                        if (icon) icon.setAttribute('href', '#icon-edit');
-                        button.dataset.tooltip = "Apply Edit";
-                    } else {
-                        if (icon) icon.setAttribute('href', '#icon-send');
-                        button.dataset.tooltip = "Generate";
-                    }
-                }
-            } else {
-                // 他のボタン (翻訳ボタンなど)
-                const icon = button.querySelector('svg');
-                if (isLoading) {
-                    button.disabled = true;
-                    if (icon) icon.classList.add('animate-spin'); 
-                } else {
-                    button.disabled = false;
-                    if (icon) icon.classList.remove('animate-spin');
-                }
-            }
-        }
-
-        // --- ★ 追加: D&D / Upload Handlers ---
-
-        function handleDragOver(event) {
-            // ... (変更なし)
-            event.preventDefault();
-            if (generationInProgress || isEditingMode) return;
-            imageDisplay.classList.add('drag-over');
-        }
-
-        function handleDragLeave(event) {
-            // ... (変更なし)
-            event.preventDefault();
-            imageDisplay.classList.remove('drag-over');
-        }
-
-        function handleDrop(event) {
-            // ... (変更なし)
-            event.preventDefault();
-            imageDisplay.classList.remove('drag-over');
-            if (generationInProgress) return;
-
-            const file = event.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                readImageFile(file);
-            } else {
-                showToast("Please drop an image file (PNG, JPG, etc.)", "warning");
-            }
-        }
-
-        function handleFileSelect(event) {
-            // ... (変更なし)
-            const file = event.target.files[0];
-            if (file && file.type.startsWith('image/')) {
-                readImageFile(file);
-            }
-            uploadImageInput.value = null; // 同じファイルを選択できるようにリセット
-        }
-
-        function readImageFile(file) {
-            // ... (変更なし)
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                loadUploadedImage(e.target.result);
-            };
-            reader.onerror = (e) => {
-                showToast("Failed to read image file.", "error");
-            };
-            reader.readAsDataURL(file);
-        }
-
-        /**
-         * アップロードまたはHistoryから画像を読み込み、編集モードに設定する
-         * @param {string} base64DataUrl (Data URL: "data:image/...")
-         * @param {string} [prompt] (Historyから読み込む場合の既存プロンプト)
-         */
-        function loadUploadedImage(base64DataUrl, prompt = "") {
-            // ... (変更なし)
-            generatedImage.src = base64DataUrl;
-            generatedImage.classList.remove('hidden');
-            placeholder.style.display = 'none';
-            
-            // "data:image/png;base64," の部分を削除
-            currentEditImageBase64 = base64DataUrl.split(',')[1]; 
-            
-            editButton.classList.remove('hidden');
-            closeImageButton.classList.remove('hidden');
-            
-            showToast("Image loaded. Ready to edit.", "info");
-            toggleEditMode(true); // 編集モードに設定
-
-            if (prompt) {
-                promptInput.value = prompt;
-            } else {
-                // プロンプト入力欄をクリアまたは指示を表示
-                promptInput.value = ""; // 新規アップロード時はクリア
-            }
-        }
-
-    </script>
-</body>
-</html>
+    try {
+        await fetch(gasUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(errorData)
+        });
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+    } catch (err) {
+        console.error("GAS error log save error:", err);
+        return new Response(JSON.stringify({ error: "Failed to save error log" }), { status: 500 });
+    }
+}
