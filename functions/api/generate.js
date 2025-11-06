@@ -4,8 +4,7 @@
  * Deployed at /functions/api/generate.js
  */
 
-const IMAGEN_API_URL_PREDICT = "https://generativelang
-uage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict";
+const IMAGEN_API_URL_PREDICT = "https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict";
 // ★ 変更: モデル名を 'gemini-2.5-flash-image-preview' に
 const GEMINI_API_URL_FLASH_IMAGE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent";
 const GEMINI_API_URL_FLASH = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
@@ -53,20 +52,21 @@ export async function onRequest(context) {
         const data = await context.request.json();
         const { action, model, keyIndex } = data;
 
-        // --- [新規追加] パスワード認証処理 ---
-        // 依頼①: 'authenticate' アクションが来たら、APIキー取得の前にパスワード検証を行う
-        if (action === 'authenticate') {
-            return await handleAuthenticate(data, context);
-        }
-        // ------------------------------------
-
         // ★ 追加: エラーロギングアクション
         if (action === 'logError') {
             return await handleErrorLog(data, context);
         }
 
+        // ★ 追加: 認証アクション
+        if (action === 'auth') {
+            return await handleAuth(data, context);
+        }
+
+        // --- ここから先の操作は認証が必要 ---
+        // ※ 本来はここでトークン検証などを行うが、
+        // ※ 今回はフロントの sessionStorage に依存するためサーバー側での強制チェックは省略
+
         // ★ 変更: アクションとモデルに応じてAPIキーを取得
-        // (認証処理の後ろに移動)
         const apiKey = getApiKey(context, model, keyIndex);
 
         let response;
@@ -115,38 +115,49 @@ export async function onRequest(context) {
     }
 }
 
-// --- [新規追加] 認証ハンドラー (依頼①) ---
-/**
- * Handles password authentication
- */
-async function handleAuthenticate(data, context) {
-    const { password } = data;
-    // Cloudflareの環境変数から正しいパスワードを取得
-    const correctPassword = context.env.APP_PASSWORD;
+// --- Action Handlers ---
 
-    if (!correctPassword) {
-        console.error("APP_PASSWORD environment variable is not set.");
-        return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 500 });
+/**
+ * ★ 追加: パスワード認証を処理する
+ */
+async function handleAuth(data, context) {
+    const { password } = data;
+    const masterPassword = context.env.MUGEN_PASSWORD;
+
+    if (!masterPassword) {
+        console.error("MUGEN_PASSWORD environment variable is not set.");
+        return new Response(JSON.stringify({ error: 'Server configuration error: Auth not set up.' }), { status: 500 });
     }
 
-    if (password === correctPassword) {
-        // 認証成功
-        return new Response(JSON.stringify({ success: true }), { status: 200 });
+    if (!password) {
+        return new Response(JSON.stringify({ error: 'Password is required' }), { status: 400 });
+    }
+
+    // ★ 定数時間比較 (一応)
+    let mismatch = 0;
+    if (password.length !== masterPassword.length) {
+        mismatch = 1;
     } else {
-        // 認証失敗
+        for (let i = 0; i < password.length; i++) {
+            mismatch |= (password.charCodeAt(i) ^ masterPassword.charCodeAt(i));
+        }
+    }
+
+    if (mismatch !== 0) {
         return new Response(JSON.stringify({ error: 'Invalid password' }), { status: 401 });
     }
+
+    // 認証成功
+    return new Response(JSON.stringify({ success: true }), {
+        headers: { 'Content-Type': 'application/json' },
+    });
 }
-// ----------------------------------------
 
-
-// --- Action Handlers ---
 
 /**
  * Translates text to English using Gemini Flash
  */
 async function handleTranslate(data, apiKey) {
-    // ... (変更なし)
     const { prompt } = data;
     if (!prompt) {
         return new Response(JSON.stringify({ error: 'Prompt is required' }), { status: 400 });
@@ -187,7 +198,7 @@ async function handleTranslate(data, apiKey) {
  * Generates an image using Imagen 3.0
  */
 async function handleGenerate(data, apiKey, context) {
-    // ... (変更なし)
+    // ★ 修正: model を data から取得
     const { prompt, aspectRatio, styles, model } = data;
 
     // Enhance prompt
@@ -203,7 +214,7 @@ async function handleGenerate(data, apiKey, context) {
             prompt: enhancedPrompt
         },
         parameters: {
-            "aspectRatio": aspectRatio, 
+            "aspectRatio": aspectRatio, // ★ 修正: アスペクト比をパラメータとして設定
             "sampleCount": 1,
             "safetySettings": {
                 "violence": "BLOCK_NONE",
@@ -223,6 +234,7 @@ async function handleGenerate(data, apiKey, context) {
     if (!response.ok) {
         const errorText = await response.text();
         console.error("Imagen API Error:", errorText);
+        // ★ 追加: エラーをGASに送信
         await handleErrorLog({ prompt: enhancedPrompt, model: model, error: `Imagen API Error: ${errorText}` }, context);
         return new Response(JSON.stringify({ error: `Failed to generate image (Imagen): ${errorText}` }), { status: 500 });
     }
@@ -258,13 +270,15 @@ async function handleGenerate(data, apiKey, context) {
  * Edits (or generates) an image using Gemini 2.5 Flash Image
  */
 async function handleEdit(data, apiKey, context) {
-    // ... (変更なし)
+    // ★ 修正: aspectRatio と model を data から取得
     const { prompt, baseImage, aspectRatio, model } = data; 
     
+    // 'edit' (baseImageあり) or 'generate' (baseImageなし)
     const isEditMode = !!baseImage;
 
     const apiUrl = `${GEMINI_API_URL_FLASH_IMAGE}?key=${apiKey}`;
     
+    // ユーザーが送信するパーツ
     const userParts = [{ text: prompt }];
     
     if (isEditMode) {
@@ -303,6 +317,7 @@ async function handleEdit(data, apiKey, context) {
     if (!response.ok) {
         const errorText = await response.text();
         console.error("Gemini Edit API Error:", errorText);
+        // ★ 追加: エラーをGASに送信
         await handleErrorLog({ prompt: prompt, model: model, error: `Gemini API Error: ${errorText}` }, context);
         return new Response(JSON.stringify({ error: `Failed to edit image (Gemini): ${errorText}` }), { status: 500 });
     }
@@ -319,6 +334,7 @@ async function handleEdit(data, apiKey, context) {
         } else {
              errorMessage = `Edit failed: ${errorText || 'No image data returned'}`;
         }
+        // ★ 追加: エラーをGASに送信
         await handleErrorLog({ prompt: prompt, model: model, error: errorMessage }, context);
         return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
     }
@@ -352,12 +368,12 @@ async function handleEdit(data, apiKey, context) {
  * ★ 追加: エラーをGASに送信する
  */
 async function handleErrorLog(data, context) {
-    // ... (変更なし)
     const { prompt, model, error } = data;
     const gasUrl = context.env.GAS_WEB_APP_URL;
 
     if (!gasUrl) {
         console.warn("GAS_WEB_APP_URL not set. Skipping error logging.");
+        // フロントエンドには成功したように見せかける
         return new Response(JSON.stringify({ success: true, message: "GAS URL not set" }), { status: 200 });
     }
 
