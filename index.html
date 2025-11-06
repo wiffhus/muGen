@@ -373,9 +373,9 @@
                         <label for="auto-retry-select" class="block text-sm font-medium text-gray-300 mb-1">Auto Retry</label>
                         <select id="auto-retry-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
                             <option value="0">Off</option>
-                            <option value="3">3 Times</option>
                             <option value="5">5 Times</option>
                             <option value="10">10 Times</option>
+                            <option value="50">50 Times</option>
                             <option value="-1">Custom...</option>
                         </select>
                     </div>
@@ -1081,7 +1081,7 @@
             
             autoRetrySelect.addEventListener('change', () => {
                 if(autoRetrySelect.value === '-1') {
-                    const customRetry = prompt("Enter number of retries:", "15");
+                    const customRetry = prompt("Enter number of retries:", "100");
                     if (customRetry && !isNaN(parseInt(customRetry))) {
                         const val = parseInt(customRetry);
                         const newOption = new Option(`${val} Times (Custom)`, val, true, true);
