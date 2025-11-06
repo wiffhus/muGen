@@ -11,10 +11,9 @@
         /* Inter Font (Mac-like) */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
-        /* ★ 変更: html, body に overscroll-behavior を設定 */
-        html, body {
+        body {
             font-family: 'Inter', sans-serif;
-            overscroll-behavior: none; /* スワイプでの「戻る」や「更新」を無効化 */
+            overscroll-behavior: none;
         }
 
         /* Custom scrollbar for sidebar */
@@ -29,7 +28,7 @@
             background-color: #1f2937;
         }
 
-        /* Dynamic Noise Animation */
+        /* ★ 変更: Dynamic Noise Animation */
         .noise-container {
             position: absolute;
             top: 0;
@@ -37,7 +36,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background: #111827;
+            background: #111827; /* 背景色 */
             z-index: 10;
             display: none; /* Hidden by default */
             opacity: 0;
@@ -47,6 +46,8 @@
             display: block;
             opacity: 1;
         }
+
+        /* ::before (細かいノイズ) */
         .noise-container::before {
             content: "";
             position: absolute;
@@ -54,12 +55,33 @@
             left: -50%;
             width: 200%;
             height: 200%;
+            /* 既存のSVGノイズ (変更なし) */
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
             background-size: 128px 128px;
-            opacity: 0.15;
-            animation: noise-animation 0.2s linear infinite;
+            /* ★ アニメーションを変更: noise-fast (位置移動) と noise-opacity (明滅) */
+            animation: 
+                noise-fast 0.2s linear infinite,
+                noise-opacity 1.5s ease-in-out infinite alternate;
         }
-        @keyframes noise-animation {
+        
+        /* ★ ::after (ぼんやりしたノイズ、追加) */
+        .noise-container::after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            /* ★ 新しいSVG (ぼかしノイズ) */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cfilter id='b' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02 0.05' numOctaves='3' seed='1' stitchTiles='stitch'/%3E%3CfeGaussianBlur stdDeviation='20'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
+            background-size: cover;
+            /* ★ アニメーションを追加: noise-slow (ゆっくり拡大縮小・回転) */
+            animation: noise-slow 8s ease-in-out infinite alternate;
+            opacity: 0.4; /* 少し濃いめ */
+        }
+
+        /* 既存のアニメーション (名前変更: noise-fast) */
+        @keyframes noise-fast {
             0% { transform: translate(0, 0); }
             10% { transform: translate(-5%, -5%); }
             20% { transform: translate(-10%, 5%); }
@@ -73,6 +95,24 @@
             100% { transform: translate(5%, 0); }
         }
 
+        /* ★ 追加: 明滅アニメーション */
+        @keyframes noise-opacity {
+            0% { opacity: 0.1; }
+            100% { opacity: 0.25; }
+        }
+
+        /* ★ 追加: ゆっくり動くぼかしアニメーション */
+        @keyframes noise-slow {
+            0% { 
+                transform: scale(1) rotate(0deg); 
+                opacity: 0.2;
+            }
+            100% { 
+                transform: scale(1.2) rotate(5deg); 
+                opacity: 0.4;
+            }
+        }
+
         /* Custom Checkbox */
         .style-checkbox:checked + label {
             background-color: #4f46e5;
@@ -80,7 +120,7 @@
             color: #ffffff;
         }
 
-        /* Modal styles */
+        /* (以降のCSSは変更なし) */
         .modal {
             display: none;
             position: fixed;
@@ -94,27 +134,6 @@
         .modal.flex {
             display: flex;
         }
-        
-        /* ★ 追加: 認証モーダルは z-index を最上位(60)に */
-        #auth-modal {
-            z-index: 60;
-        }
-
-        /* ★ 依頼: モーダル画像のラッパー */
-        #modal-image-wrapper {
-            transition: all 0.3s ease;
-        }
-        
-        /* ★ 依頼: モーダル画像のズームスタイル */
-        #modal-image {
-            transition: transform 0.2s ease-out;
-            /* ズーム時にピクセルがぼやけないようにする（ブラウザによる） */
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-            /* ズームの基点を左上にする（スクロールと連動させるため） */
-            transform-origin: top left;
-        }
-
 
         /* Tooltip */
         [data-tooltip] {
@@ -192,8 +211,7 @@
 
     </style>
 </head>
-<!-- ★ 変更: h-screen w-screen overflow-hidden を削除し、min-h-screen を追加 -->
-<body class="bg-gray-900 text-gray-100 min-h-screen w-screen flex">
+<body class="bg-gray-900 text-gray-100 h-screen w-screen overflow-hidden flex">
 
     <!-- (Omitted: Inline SVG Icons Definition for brevity) -->
     <svg width="0" height="0" class="hidden">
@@ -240,25 +258,10 @@
         <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-x-circle">
             <circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>
         </symbol>
-        <!-- ★ 追加: パスワード/ロックアイコン (Lock) -->
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-lock">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-        </symbol>
-        
-        <!-- ★ 依頼: ズームアイコン追加 -->
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-in">
-            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-out">
-            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-reset">
-            <path d="M3 2v6h6"></path><path d="M21 12A9 9 0 0 0 6 5.3L3 8"></path><path d="M21 22v-6h-6"></path><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"></path>
-        </symbol>
     </svg>
 
-    <!-- ★ 変更: h-full を h-screen (ビューポート高) に変更し、スマホでの高さを確保 -->
-    <aside id="sidebar" class="bg-gray-800 h-screen w-64 p-4 flex flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
+    <!-- ★ 変更: サイドバー 初期状態を md:translate-x-0 (PC表示) に -->
+    <aside id="sidebar" class="bg-gray-800 h-full w-64 p-4 flex flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-xl font-bold text-white">muGen History</h1>
             <!-- ★ 変更: md:hidden (スマホ専用クローズ) -->
@@ -289,8 +292,8 @@
         </div>
     </aside>
 
-    <!-- ★ 変更: h-full を削除し、min-h-screen を追加 (フッター固定のため) -->
-    <main id="main-content" class="flex-1 flex flex-col transition-all duration-300 ease-in-out md:ml-64 min-h-screen">
+    <!-- ★ 変更: main-content 初期状態を md:ml-64 (PCマージンあり) に -->
+    <main id="main-content" class="flex-1 h-full flex flex-col transition-all duration-300 ease-in-out md:ml-64">
         
         <header class="flex-shrink-0 bg-gray-900/70 backdrop-blur-sm h-16 flex items-center px-6 shadow-md z-20">
             <!-- ★ 変更: md:hidden を削除し、トグルボタンに -->
@@ -308,8 +311,7 @@
             </div>
         </header>
 
-        <!-- ★ 変更: h-full を削除。IDを追加。padding-bottomはJSで制御 -->
-        <div id="image-container" class="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-hidden">
+        <div class="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-hidden">
             <!-- ★ 変更: ドラッグ＆ドロップとファイル入力対応 -->
             <div id="image-display" class="w-full h-full max-w-3xl max-h-[70vh] flex items-center justify-center bg-gray-800 rounded-lg shadow-inner relative border-2 border-transparent transition-all">
                 <img id="generated-image" src="" alt="Generated Image" class="hidden max-w-full max-h-full object-contain rounded-lg">
@@ -327,6 +329,7 @@
                 </div>
 
                 <div id="loading-animation" class="noise-container">
+                    <!-- スピナーはノイズコンテナの子要素なので、ノイズエフェクトの上に表示されます -->
                     <div class="absolute inset-0 flex items-center justify-center">
                         <svg class="w-12 h-12 text-indigo-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-loader"></use></svg>
                     </div>
@@ -342,9 +345,8 @@
             </div>
         </div>
 
-        <!-- ★ 変更: Prompt Input Area (Footer) -->
-        <!-- ID追加, flex-shrink-0 削除, fixed, bottom-0, w-full, z-10, md:left-64, transition-all 追加 -->
-        <footer id="prompt-footer" class="p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm z-10 fixed bottom-0 w-full md:left-64 transition-all duration-300 ease-in-out">
+        <!-- Prompt Input Area -->
+        <footer class="flex-shrink-0 p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm z-10">
             <form id="generation-form" class="max-w-4xl mx-auto">
                 <!-- Options Toolbar -->
                 <!-- ★ 変更: ツールバー自体は常に flex -->
@@ -378,14 +380,6 @@
                             <option value="10">10 Times</option>
                             <option value="-1">Custom...</option>
                         </select>
-                    </div>
-                    
-                    <!-- ★ 依頼①: Edit with 2.5 flash ボタン -->
-                    <div id="edit-with-flash-group" class="flex items-end">
-                        <button type="button" id="edit-with-flash-button" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition flex items-center gap-2" data-tooltip="Switch to Edit Mode with Gemini 2.5 Flash">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
-                            Edit with 2.5 flash
-                        </button>
                     </div>
                 </div>
 
@@ -438,22 +432,13 @@
     </main>
 
     <!-- (Omitted: Image Modal for brevity) -->
-    <!-- ★ 依頼: モーダル構造変更 -->
     <div id="image-modal" class="modal">
-        <!-- ★ 変更: w-full max-w-4xl -> w-11/12 max-w-6xl (より大きく) -->
-        <div class="bg-gray-800 rounded-lg shadow-xl w-11/12 max-w-6xl max-h-[95vh] flex flex-col p-4">
-            
-            <!-- ★ 依頼: 画像をラッパーで囲む -->
-            <div id="modal-image-wrapper" class="flex-1 flex items-center justify-center overflow-auto bg-gray-900/50 rounded-lg min-h-[50vh] mb-4">
-                <img id="modal-image" src="" class="max-w-full max-h-full object-contain">
-            </div>
-
-            <!-- ★ 変更: p-4 bg-gray-900 -> p-0 (ラッパーから移動) -->
-            <div class="bg-gray-900 rounded-b-lg p-4">
+        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col p-4">
+            <img id="modal-image" src="" class="max-w-full max-h-[70vh] object-contain mx-auto">
+            <div class="p-4 bg-gray-900 rounded-b-lg mt-4">
                 <p class="text-sm text-gray-300 mb-2">Prompt:</p>
-                <p id="modal-prompt" class="text-white bg-gray-700 p-3 rounded-lg max-h-24 overflow-y-auto"></p>
-                
-                <!-- ★ 変更: モーダルにEdit/Zoomボタン追加 -->
+                <p id="modal-prompt" class="text-white bg-gray-700 p-3 rounded-lg"></p>
+                <!-- ★ 変更: モーダルにEditボタン追加 -->
                 <div class="flex flex-wrap gap-4 mt-4">
                     <button id="modal-copy" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition" data-tooltip="Copy Prompt">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-copy"></use></svg>
@@ -467,23 +452,9 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
                         <span>Edit</span>
                     </button>
-                    
-                    <!-- ★ 依頼: ズームボタン追加 -->
-                    <div class="flex items-center gap-2 ml-auto">
-                        <button id="modal-zoom-out" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white p-2.5 rounded-lg transition" data-tooltip="Zoom Out">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-zoom-out"></use></svg>
-                        </button>
-                        <button id="modal-zoom-in" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white p-2.5 rounded-lg transition" data-tooltip="Zoom In">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-zoom-in"></use></svg>
-                        </button>
-                        <button id="modal-zoom-reset" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white p-2.5 rounded-lg transition" data-tooltip="Reset Zoom">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-zoom-reset"></use></svg>
-                        </button>
-                    </div>
-
                 </div>
             </div>
-            <button id="modal-close" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-gray-800/50 rounded-full p-1">
+            <button id="modal-close" class="absolute top-4 right-4 text-gray-400 hover:text-white">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
             </button>
         </div>
@@ -503,25 +474,6 @@
             </div>
         </div>
     </div>
-    
-    <!-- ★ 追加: パスワード認証モーダル -->
-    <div id="auth-modal" class="modal flex"> <!-- 初期表示を flex に -->
-        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
-            <div class="flex items-center justify-center mb-4">
-                <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-lock"></use></svg>
-                <h2 class="text-xl font-bold text-white ml-2">Authentication Required</h2>
-            </div>
-            <p class="text-gray-400 text-center text-sm mb-4">Please enter the password to access muGen.</p>
-            <form id="auth-form">
-                <input type="password" id="auth-password" class="block w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Password" required>
-                <p id="auth-error" class="text-red-400 text-sm mt-2 hidden"></p>
-                <button id="auth-submit" type="submit" class="w-full mt-4 p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium">
-                    Login
-                </button>
-            </form>
-        </div>
-    </div>
-
 
     <script>
         // --- CONSTANTS & STATE ---
@@ -531,9 +483,6 @@
             "Fantasy art", "Minimalism", "Animation", "Ghibli-style", "Disney-style"
         ];
         
-        // ★ 依頼④: カスタムスタイル用
-        const CUSTOM_STYLES_KEY = 'muGenCustomStyles';
-
         // ★ 追加: 料金計算用 (仮の単価)
         const PRICE_IMAGEN_USD = 0.02; // Imagen 3.0 (仮)
         const PRICE_GEMINI_FLASH_IMAGE_USD = 0.002; // Gemini Flash Image (仮)
@@ -551,16 +500,6 @@
         let currentFetchController = null;
         // ★ 追加: トーストのタイマー
         let toastTimeoutId = null;
-        
-        // ★ 追加: スワイプ検出用
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let touchMoveX = 0;
-
-        // ★ 依頼: ズーム用
-        let modalZoomLevel = 1.0;
-        const MAX_ZOOM = 10;
-        const MIN_ZOOM = 0.5;
 
 
         // --- DOM ELEMENTS ---
@@ -570,10 +509,6 @@
         const sidebarToggleButton = document.getElementById('sidebar-toggle-button');
         const closeSidebarBtn = document.getElementById('close-sidebar');
         
-        // ★ 追加: レイアウト調整用
-        const imageContainer = document.getElementById('image-container');
-        const promptFooter = document.getElementById('prompt-footer');
-
         const generationForm = document.getElementById('generation-form');
         const promptInput = document.getElementById('prompt-input');
         const translateButton = document.getElementById('translate-button');
@@ -600,12 +535,6 @@
         const modalClose = document.getElementById('modal-close');
         const modalEdit = document.getElementById('modal-edit'); // ★ 追加
         
-        // ★ 依頼: ズーム用DOM
-        const modalImageWrapper = document.getElementById('modal-image-wrapper');
-        const modalZoomIn = document.getElementById('modal-zoom-in');
-        const modalZoomOut = document.getElementById('modal-zoom-out');
-        const modalZoomReset = document.getElementById('modal-zoom-reset');
-
         const editButton = document.getElementById('edit-button');
         const closeImageButton = document.getElementById('close-image-button'); // ★ 追加
         const optionsToolbar = document.getElementById('options-toolbar');
@@ -615,8 +544,6 @@
         const aspectRatioGroup = document.getElementById('aspect-ratio-group');
         const autoRetryGroup = document.getElementById('auto-retry-group');
 
-        // ★ 依頼①: Edit ボタン
-        const editWithFlashButton = document.getElementById('edit-with-flash-button');
 
         // ★ Styles Accordion Elements
         const stylesToggleBtn = document.getElementById('styles-toggle');
@@ -641,145 +568,14 @@
         const toastClose = document.getElementById('toast-close');
         const toastCopy = document.getElementById('toast-copy');
 
-        // ★ 追加: 認証モーダル
-        const authModal = document.getElementById('auth-modal');
-        const authForm = document.getElementById('auth-form');
-        const authPassword = document.getElementById('auth-password');
-        const authSubmit = document.getElementById('auth-submit');
-        const authError = document.getElementById('auth-error');
-
-
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
-            // ★ 認証チェックを最初に行う
-            checkAuth(); 
-            
             initDB();
             initSidebar();
-            initStyles(); // ★ 依頼④: 変更あり
-            initListeners(); // ★ 依頼①: 変更あり
+            initStyles();
+            initListeners();
             loadHistory();
-            
-            // ★ 追加: フッターパディングの初期設定
-            adjustMainContentPadding();
         });
-
-        // --- ★ 追加: AUTHENTICATION ---
-        
-        /**
-         * セッションストレージをチェックし、未認証ならモーダルを表示
-         */
-        function checkAuth() {
-            if (sessionStorage.getItem('muGenAuthenticated') === 'true') {
-                authModal.classList.remove('flex'); // 認証済みなら非表示
-            } else {
-                authModal.classList.add('flex'); // 未認証なら表示
-            }
-        }
-        
-        /**
-         * パスワード認証フォームの送信ハンドラ
-         */
-        async function handleAuthSubmit(event) {
-            event.preventDefault();
-            const password = authPassword.value;
-            if (!password) return;
-
-            setLoading(authSubmit, true); // ボタンをローディング状態に
-            authError.classList.add('hidden');
-
-            try {
-                const response = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'auth',
-                        password: password
-                    })
-                });
-
-                if (response.ok) {
-                    sessionStorage.setItem('muGenAuthenticated', 'true');
-                    authModal.classList.remove('flex');
-                    showToast("Authentication successful!", "success");
-                } else {
-                    const data = await response.json();
-                    throw new Error(data.error || "Authentication failed");
-                }
-            } catch (error) {
-                console.error("Auth error:", error);
-                authError.textContent = error.message;
-                authError.classList.remove('hidden');
-                showToast(error.message, "error");
-            } finally {
-                setLoading(authSubmit, false);
-            }
-        }
-
-        // --- ★ 依頼④: CUSTOM STYLE FUNCTIONS ---
-    
-        /**
-         * localStorage からカスタムスタイルを取得
-         * @returns {string[]}
-         */
-        function getCustomStyles() {
-            try {
-                const styles = localStorage.getItem(CUSTOM_STYLES_KEY);
-                return styles ? JSON.parse(styles) : [];
-            } catch (e) {
-                console.error("Failed to parse custom styles:", e);
-                return [];
-            }
-        }
-        
-        /**
-         * localStorage にカスタムスタイルを保存
-         * @param {string[]} stylesArray
-         */
-        function saveCustomStyles(stylesArray) {
-            try {
-                localStorage.setItem(CUSTOM_STYLES_KEY, JSON.stringify(stylesArray));
-            } catch (e) {
-                console.error("Failed to save custom styles:", e);
-                showToast("Failed to save custom style", "error");
-            }
-        }
-        
-        /**
-         * カスタムスタイルを追加する
-         */
-        function handleAddCustomStyle() {
-            const newStyle = prompt("Enter new style name (e.g., 'Pixel art', 'Anime'):");
-            if (newStyle && newStyle.trim().length > 0) {
-                const trimmedStyle = newStyle.trim();
-                const customStyles = getCustomStyles();
-                
-                // 重複チェック (STYLES と customStyles の両方)
-                const allStyles = [...STYLES, ...customStyles];
-                if (allStyles.map(s => s.toLowerCase()).includes(trimmedStyle.toLowerCase())) {
-                    showToast(`Style "${trimmedStyle}" already exists.`, "warning");
-                    return;
-                }
-                
-                customStyles.push(trimmedStyle);
-                saveCustomStyles(customStyles);
-                initStyles(); // スタイルリストを再描画
-                showToast(`Style "${trimmedStyle}" added.`, "success");
-            }
-        }
-        
-        /**
-         * カスタムスタイルを削除する
-         * @param {string} styleToRemove
-         */
-        function handleRemoveCustomStyle(styleToRemove) {
-            let customStyles = getCustomStyles();
-            customStyles = customStyles.filter(s => s !== styleToRemove);
-            saveCustomStyles(customStyles);
-            initStyles(); // スタイルリストを再描画
-            showToast(`Style "${styleToRemove}" removed.`, "success");
-        }
-
 
         // --- (Omitted: IndexedDB functions for brevity) ---
         function initDB() {
@@ -935,113 +731,49 @@
 
         // --- UI INITIALIZATION ---
 
-        // ★ 変更: サイドバートグルロジック (PC/スマホ共通) + フッター位置制御
+        // ★ 変更: サイドバートグルロジック (PC/スマホ共通)
         function initSidebar() {
-            sidebarToggleButton.addEventListener('click', toggleSidebar);
-            closeSidebarBtn.addEventListener('click', () => toggleSidebar(false)); // スマホ用は強制的に閉じる
-        }
+            sidebarToggleButton.addEventListener('click', () => {
+                // サイドバーが開いているか (translate-x-full が *ない* か)
+                const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
 
-        /**
-         * ★ 新規: サイドバーの開閉を制御する関数
-         * @param {boolean} [forceOpen] - 指定すると状態を強制 (true=開, false=閉)
-         */
-        function toggleSidebar(forceOpen) {
-            // サイドバーが開いているか (translate-x-full が *ない* か)
-            const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
+                if (isSidebarOpen) {
+                    // 閉じる
+                    sidebar.classList.add('-translate-x-full');
+                    sidebar.classList.remove('md:translate-x-0'); // PC用の表示クラスも削除
+                    mainContent.classList.remove('md:ml-64'); // PC用のマージン削除
+                } else {
+                    // 開く
+                    sidebar.classList.remove('-translate-x-full');
+                    sidebar.classList.add('md:translate-x-0'); // PC用の表示クラス追加
+                    mainContent.classList.add('md:ml-64'); // PC用のマージン追加
+                }
+            });
             
-            let shouldBeOpen;
-            if (forceOpen === true) {
-                shouldBeOpen = true;
-            } else if (forceOpen === false) {
-                shouldBeOpen = false;
-            } else {
-                shouldBeOpen = !isSidebarOpen; // 指定がなければトグル
-            }
-
-            if (!shouldBeOpen) {
-                // 閉じる
+            // スマホ用クローズボタン (変更なし)
+            closeSidebarBtn.addEventListener('click', () => {
                 sidebar.classList.add('-translate-x-full');
-                sidebar.classList.remove('md:translate-x-0'); // PC用の表示クラスも削除
-                mainContent.classList.remove('md:ml-64'); // PC用のマージン削除
-                // ★ フッターの位置を左端に戻す
-                promptFooter.classList.remove('md:left-64'); 
-            } else {
-                // 開く
-                sidebar.classList.remove('-translate-x-full');
-                sidebar.classList.add('md:translate-x-0'); // PC用の表示クラス追加
-                mainContent.classList.add('md:ml-64'); // PC用のマージン追加
-                // ★ フッターの位置をサイドバー分ずらす
-                promptFooter.classList.add('md:left-64'); 
-            }
+            });
         }
 
-        // ★ 依頼④: initStyles を大幅に変更 (カスタムスタイル対応)
         function initStyles() {
             const container = document.getElementById('styles-container');
-            container.innerHTML = ""; // 既存のスタイルをクリア
-        
-            const allStyles = [...STYLES, ...getCustomStyles()];
-        
-            allStyles.forEach(style => {
-                const isCustom = !STYLES.includes(style); // これがカスタムスタイルか？
-                
+            STYLES.forEach(style => {
                 const div = document.createElement('div');
-                // ★ 依頼④: カスタムスタイル用のコンテナ（削除ボタンを含むため）
-                div.className = "flex items-center gap-1"; 
-                
-                const inputId = `style-${style.replace(/[^a-zA-Z0-9]/g, '-')}`; // IDのサニタイズ
-        
-                let labelClass = "cursor-pointer bg-gray-700 text-gray-300 border border-gray-600 rounded-full px-4 py-2 text-sm font-medium hover:bg-gray-600 transition";
-                
-                // ★ 依頼④: カスタムスタイルは色を変え、丸みを調整
-                if (isCustom) {
-                     labelClass = "cursor-pointer bg-teal-800 text-teal-100 border border-teal-600 rounded-l-full px-4 py-2 text-sm font-medium hover:bg-teal-700 transition";
-                }
-        
+                div.className = ""; 
                 div.innerHTML = `
-                    <input type="checkbox" id="${inputId}" value="${style}" class="hidden style-checkbox">
-                    <label for="${inputId}" class="${labelClass}">
+                    <input type="checkbox" id="style-${style}" value="${style}" class="hidden style-checkbox">
+                    <label for="style-${style}" class="cursor-pointer bg-gray-700 text-gray-300 border border-gray-600 rounded-full px-4 py-2 text-sm font-medium hover:bg-gray-600 transition">
                         ${style}
                     </label>
                 `;
-                
-                // ★ 依頼④: カスタムスタイルなら削除ボタンを追加
-                if (isCustom) {
-                    const removeBtn = document.createElement('button');
-                    removeBtn.type = "button";
-                    removeBtn.className = "bg-teal-800 text-teal-200 border border-teal-600 border-l-0 rounded-r-full py-2 px-2 text-sm font-medium hover:bg-red-700 hover:text-white transition";
-                    removeBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>`;
-                    removeBtn.dataset.tooltip = "Remove style";
-                    removeBtn.onclick = (e) => {
-                        e.stopPropagation(); // チェックボックスの動作を止める
-                        handleRemoveCustomStyle(style);
-                    };
-                    div.appendChild(removeBtn);
-                }
-                
                 container.appendChild(div);
             });
-        
-            // ★ 依頼④: 最後に「+」ボタンを追加
-            const addBtnContainer = document.createElement('div');
-            addBtnContainer.innerHTML = `
-                <button type="button" id="add-style-button" class="cursor-pointer bg-gray-600 text-gray-300 border border-gray-500 rounded-full px-4 py-2 text-sm font-medium hover:bg-indigo-600 hover:text-white transition flex items-center gap-1" data-tooltip="Add custom style">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    Add
-                </button>
-            `;
-            // イベントリスナーを追加
-            addBtnContainer.querySelector('#add-style-button').addEventListener('click', handleAddCustomStyle);
-            container.appendChild(addBtnContainer);
         }
 
         // --- EVENT LISTENERS ---
-        // ★ 依頼: ズームリスナー追加
         function initListeners() {
-            // ★ 認証フォーム
-            authForm.addEventListener('submit', handleAuthSubmit);
-
-            generationForm.addEventListener('submit', handleGenerationSubmit); // ★ 依頼③: 変更あり
+            generationForm.addEventListener('submit', handleGenerationSubmit);
             translateButton.addEventListener('click', handleTranslate);
             
             // ★ 追加: プロンプトボタンリスナー
@@ -1052,14 +784,6 @@
             modalCopy.addEventListener('click', handleModalCopy);
             modalRegenerate.addEventListener('click', handleModalRegenerate);
             modalEdit.addEventListener('click', handleModalEdit); // ★ 追加
-
-            // ★ 依頼: ズームボタンリスナー
-            modalZoomIn.addEventListener('click', handleZoomIn);
-            modalZoomOut.addEventListener('click', handleZoomOut);
-            modalZoomReset.addEventListener('click', handleZoomReset);
-            
-            // ★ 依頼①: リスナー追加
-            editWithFlashButton.addEventListener('click', () => toggleEditMode(true)); 
             
             editButton.addEventListener('click', () => toggleEditMode(true)); 
             closeImageButton.addEventListener('click', closeImage); // ★ 追加
@@ -1103,73 +827,8 @@
             // ★ 追加: ファイルアップロードリスナー
             uploadImageButton.addEventListener('click', () => uploadImageInput.click());
             uploadImageInput.addEventListener('change', handleFileSelect);
-
-            // ★ 追加: スマホ用レイアウト調整リスナー
-            window.addEventListener('resize', adjustMainContentPadding);
-
-            // ★ 追加: スワイプイベントリスナー
-            document.addEventListener('touchstart', handleTouchStart, { passive: true });
-            document.addEventListener('touchmove', handleTouchMove, { passive: true });
-            document.addEventListener('touchend', handleTouchEnd, { passive: true });
         }
         
-        // --- ★ 追加: LAYOUT ADJUSTMENT ---
-        
-        /**
-         * フッターの高さを計算し、メインコンテンツの下部パディングに設定
-         */
-        function adjustMainContentPadding() {
-            if (promptFooter && imageContainer) {
-                const footerHeight = promptFooter.offsetHeight;
-                imageContainer.style.paddingBottom = `${footerHeight + 20}px`; // フッターの高さ +α
-            }
-        }
-        
-        // --- ★ 追加: SWIPE HANDLERS ---
-        
-        function handleTouchStart(event) {
-            // 認証モーダル表示中はスワイプ無効
-            if (authModal.classList.contains('flex')) return;
-
-            const firstTouch = event.touches[0];
-            touchStartX = firstTouch.clientX;
-            touchStartY = firstTouch.clientY;
-            touchMoveX = firstTouch.clientX; // 移動量リセット
-        }
-
-        function handleTouchMove(event) {
-            if (authModal.classList.contains('flex')) return;
-            // Y軸の移動が大きい場合はスクロールとみなし、スワイプ処理を中断
-            if (Math.abs(event.touches[0].clientX - touchStartX) < Math.abs(event.touches[0].clientY - touchStartY)) {
-                touchStartX = 0; // スワイプ開始位置をリセット
-                return;
-            }
-            touchMoveX = event.touches[0].clientX;
-        }
-
-        function handleTouchEnd() {
-            if (authModal.classList.contains('flex')) return;
-            if (touchStartX === 0) return; // スワイプ開始されていない
-
-            const deltaX = touchMoveX - touchStartX;
-            const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
-
-            // 1. 開く: 左端 (30px) から 右 (100px以上) へスワイプ
-            if (isMobile && !isSidebarOpen && touchStartX < 30 && deltaX > 100) {
-                toggleSidebar(true); // 開く
-            }
-            // 2. 閉じる: サイドバーが開いているときに 左 (-100px以上) へスワイプ
-            else if (isMobile && isSidebarOpen && deltaX < -100) {
-                toggleSidebar(false); // 閉じる
-            }
-            
-            // リセット
-            touchStartX = 0;
-            touchStartY = 0;
-            touchMoveX = 0;
-        }
-
-
         // --- CORE LOGIC ---
 
         function toggleStylesAccordion() {
@@ -1179,14 +838,8 @@
 
         function handlePromptKeydown(event) {
             if (isMobile) {
-                // ★ モバイルの場合: Shift+Enter で改行、Enterのみで送信
-                if (event.key === 'Enter' && !event.shiftKey) {
-                     event.preventDefault();
-                     handleGenerationSubmit(new Event('submit'));
-                }
-                return;
+                return; // モバイルでは無効
             }
-            // PC (ダブルエンター)
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault(); 
                 const now = new Date().getTime();
@@ -1222,7 +875,6 @@
         }
 
         // ★ 変更: 編集モードインジケーター制御 + ツールバー制御
-        // ★ 依頼②: autoRetryGroup の非表示を解除
         function toggleEditMode(forceOn) { 
             isEditingMode = forceOn;
             
@@ -1238,10 +890,7 @@
                 // ★ 変更: ツールバーの項目を個別に制御
                 optionsToolbar.style.display = 'flex'; // ツールバー自体は表示
                 modelSelectGroup.style.display = 'none'; // モデル選択は隠す
-                
-                // ★ 依頼②: 編集モードでもリトライを表示
-                autoRetryGroup.style.display = 'block'; 
-                
+                autoRetryGroup.style.display = 'none'; // リトライも隠す
                 // ★ 修正: Gemini編集モードではアスペクト比は非表示 (APIがサポートしていないため)
                 aspectRatioGroup.style.display = 'none'; 
                 
@@ -1265,9 +914,6 @@
             }
             // ★ ボタンアイコンを更新
             setLoading(generateButton, false);
-            
-            // ★ フッターの高さが変わる可能性があるのでパディングを再調整
-            setTimeout(adjustMainContentPadding, 100);
         }
 
         async function handleTranslate() {
@@ -1315,7 +961,6 @@
         }
 
         // ★ 変更: キャンセル機能 + エラー時のGAS送信
-        // ★ 依頼③: スタイルのみ編集のロジックを反映
         async function handleGenerationSubmit(event) {
             if (event) event.preventDefault(); 
             
@@ -1329,23 +974,11 @@
                 return;
             }
 
-            // ★ 依頼③: ロジック変更
             const prompt = promptInput.value;
-            const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value);
-            
-            let finalPrompt = prompt;
-            
-            if (isEditingMode && !prompt && selectedStyles.length > 0) {
-                // 編集モード、プロンプト無し、スタイル有りの場合
-                // 続行し、プロンプトを自動生成
-                finalPrompt = `Apply the following style(s): ${selectedStyles.join(', ')}`;
-                showToast(`Applying style(s) as edit instruction...`, "info");
-            } else if (!prompt) {
-                // 上記以外でプロンプトが無い場合はエラー
+            if (!prompt) {
                 showToast("Please enter a prompt", "warning");
                 return;
             }
-            // ★ 依頼③: ここまで
 
             // ★ 編集モードでベース画像がない場合のエラー
             if (isEditingMode && !currentEditImageBase64) {
@@ -1363,13 +996,13 @@
             editButton.classList.add('hidden');
             closeImageButton.classList.add('hidden'); // ★ 生成中は非表示
 
-            // const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value); // ★ 上に移動済み
+            const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value);
             const model = modelSelect.value; 
             apiKeyCounter++; 
             
             const payload = {
                 action: isEditingMode ? 'edit' : 'generate',
-                prompt: finalPrompt, // ★ 依頼③: finalPrompt を使用
+                prompt: prompt,
                 model: model, 
                 keyIndex: apiKeyCounter, 
                 aspectRatio: aspectRatioSelect.value, // ★ 編集モードでも送信するが、サーバー側 (generate.js) で無視される
@@ -1396,7 +1029,7 @@
                     currentEditImageBase64 = data.base64; // Save for editing
                     
                     // ★ 変更: モデル情報、アスペクト比、スタイルを渡す
-                    saveImageToDB(finalPrompt, data.translatedPrompt || finalPrompt, base64, model, aspectRatioSelect.value, selectedStyles); 
+                    saveImageToDB(prompt, data.translatedPrompt || prompt, base64, model, aspectRatioSelect.value, selectedStyles); 
                     showToast(isEditingMode ? "Edit successful" : "Generation successful", "success");
                     editButton.classList.remove('hidden');
                     closeImageButton.classList.remove('hidden'); // ★ 表示
@@ -1411,8 +1044,7 @@
                     }
 
                     // ★ 追加: 生成成功後、プロンプトをクリア
-                    // ★ 依頼③: スタイルのみ編集の場合、自動生成したプロンプトが残るのでクリアする
-                    if (!isEditingMode || (isEditingMode && !prompt && selectedStyles.length > 0)) {
+                    if (!isEditingMode) { // 編集モードの時はクリアしない
                         promptInput.value = "";
                     }
                     
@@ -1474,11 +1106,6 @@
                     }
                     console.warn(`Attempt ${attempt} failed:`, error.message);
                     if (attempt === maxRetries) {
-                        // ★ 認証エラー (401) の場合は、セッションをクリアしてリロード
-                        if (error.message.includes('401') || error.message.includes('Authentication failed')) {
-                            sessionStorage.removeItem('muGenAuthenticated');
-                            location.reload();
-                        }
                         throw error; 
                     }
                     attempt++;
@@ -1526,7 +1153,6 @@
         // --- MODAL & TOAST functions ---
         
         // ★ 変更: base64 (raw) もデータセットに保存
-        // ★ 依頼: ズームリセット処理を追加
         function showImageInModal(base64DataUrl, prompt, translatedPrompt, rawBase64) {
             modalImage.src = base64DataUrl;
             modalPrompt.textContent = translatedPrompt || prompt;
@@ -1534,10 +1160,6 @@
             modalRegenerate.dataset.translatedPrompt = translatedPrompt;
             modalEdit.dataset.base64 = rawBase64; // ★ Raw Base64
             modalEdit.dataset.prompt = prompt; // ★ 元のプロンプト
-            
-            // ★ 依頼: モーダル表示時にズームをリセット
-            handleZoomReset();
-
             imageModal.classList.add('flex');
         }
         
@@ -1565,44 +1187,6 @@
             loadUploadedImage(`data:image/png;base64,${base64}`, prompt);
             imageModal.classList.remove('flex');
         }
-
-        // --- ★ 依頼: ズームハンドラ関数 ---
-        
-        function handleZoomIn() {
-            modalZoomLevel = Math.min(modalZoomLevel * 1.5, MAX_ZOOM);
-            updateZoom();
-        }
-
-        function handleZoomOut() {
-            modalZoomLevel = Math.max(modalZoomLevel / 1.5, MIN_ZOOM);
-            updateZoom();
-        }
-
-        function handleZoomReset() {
-            modalZoomLevel = 1.0;
-            updateZoom();
-            // ★ ズームリセット時にスクロール位置もリセット
-            if (modalImageWrapper) {
-                modalImageWrapper.scrollTop = 0;
-                modalImageWrapper.scrollLeft = 0;
-            }
-        }
-
-        function updateZoom() {
-            if (modalImage) {
-                modalImage.style.transform = `scale(${modalZoomLevel})`;
-                
-                // ★ 変更: ズームレベルが 1.0 (デフォルト) の時だけフィットさせる
-                if (modalZoomLevel === 1.0) {
-                    modalImage.classList.add('max-w-full', 'max-h-full', 'object-contain');
-                } else {
-                    // ズームインでもズームアウトでも、最大サイズ制限を解除
-                    modalImage.classList.remove('max-w-full', 'max-h-full', 'object-contain');
-                }
-            }
-        }
-        // ------------------------------------
-
 
         // ★ 変更: showToast (エラー時は自動で消えない)
         function showToast(message, type = "success") {
@@ -1677,18 +1261,6 @@
         
         // ★ 変更: アイコン切り替え (isEditingMode 対応)
         function setLoading(button, isLoading) {
-            // ★ 認証ボタンのローディング処理
-            if (button.id === 'auth-submit') {
-                if (isLoading) {
-                    button.disabled = true;
-                    button.innerHTML = '<svg class="w-5 h-5 text-white animate-spin mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-loader"></use></svg>';
-                } else {
-                    button.disabled = false;
-                    button.innerHTML = 'Login';
-                }
-                return;
-            }
-        
             if (button.id === 'generate-button') {
                 const icon = button.querySelector('svg use');
                 if (isLoading) {
