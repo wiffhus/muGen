@@ -100,6 +100,21 @@
             z-index: 60;
         }
 
+        /* ★ 依頼: モーダル画像のラッパー */
+        #modal-image-wrapper {
+            transition: all 0.3s ease;
+        }
+        
+        /* ★ 依頼: モーダル画像のズームスタイル */
+        #modal-image {
+            transition: transform 0.2s ease-out;
+            /* ズーム時にピクセルがぼやけないようにする（ブラウザによる） */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            /* ズームの基点を左上にする（スクロールと連動させるため） */
+            transform-origin: top left;
+        }
+
 
         /* Tooltip */
         [data-tooltip] {
@@ -228,6 +243,17 @@
         <!-- ★ 追加: パスワード/ロックアイコン (Lock) -->
         <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-lock">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </symbol>
+        
+        <!-- ★ 依頼: ズームアイコン追加 -->
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-in">
+            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-out">
+            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-reset">
+            <path d="M3 2v6h6"></path><path d="M21 12A9 9 0 0 0 6 5.3L3 8"></path><path d="M21 22v-6h-6"></path><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"></path>
         </symbol>
     </svg>
 
@@ -412,13 +438,22 @@
     </main>
 
     <!-- (Omitted: Image Modal for brevity) -->
+    <!-- ★ 依頼: モーダル構造変更 -->
     <div id="image-modal" class="modal">
-        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col p-4">
-            <img id="modal-image" src="" class="max-w-full max-h-[70vh] object-contain mx-auto">
-            <div class="p-4 bg-gray-900 rounded-b-lg mt-4">
+        <!-- ★ 変更: w-full max-w-4xl -> w-11/12 max-w-6xl (より大きく) -->
+        <div class="bg-gray-800 rounded-lg shadow-xl w-11/12 max-w-6xl max-h-[95vh] flex flex-col p-4">
+            
+            <!-- ★ 依頼: 画像をラッパーで囲む -->
+            <div id="modal-image-wrapper" class="flex-1 flex items-center justify-center overflow-auto bg-gray-900/50 rounded-lg min-h-[50vh] mb-4">
+                <img id="modal-image" src="" class="max-w-full max-h-full object-contain">
+            </div>
+
+            <!-- ★ 変更: p-4 bg-gray-900 -> p-0 (ラッパーから移動) -->
+            <div class="bg-gray-900 rounded-b-lg p-4">
                 <p class="text-sm text-gray-300 mb-2">Prompt:</p>
-                <p id="modal-prompt" class="text-white bg-gray-700 p-3 rounded-lg"></p>
-                <!-- ★ 変更: モーダルにEditボタン追加 -->
+                <p id="modal-prompt" class="text-white bg-gray-700 p-3 rounded-lg max-h-24 overflow-y-auto"></p>
+                
+                <!-- ★ 変更: モーダルにEdit/Zoomボタン追加 -->
                 <div class="flex flex-wrap gap-4 mt-4">
                     <button id="modal-copy" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition" data-tooltip="Copy Prompt">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-copy"></use></svg>
@@ -432,9 +467,23 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
                         <span>Edit</span>
                     </button>
+                    
+                    <!-- ★ 依頼: ズームボタン追加 -->
+                    <div class="flex items-center gap-2 ml-auto">
+                        <button id="modal-zoom-out" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white p-2.5 rounded-lg transition" data-tooltip="Zoom Out">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-zoom-out"></use></svg>
+                        </button>
+                        <button id="modal-zoom-in" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white p-2.5 rounded-lg transition" data-tooltip="Zoom In">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-zoom-in"></use></svg>
+                        </button>
+                        <button id="modal-zoom-reset" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white p-2.5 rounded-lg transition" data-tooltip="Reset Zoom">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-zoom-reset"></use></svg>
+                        </button>
+                    </div>
+
                 </div>
             </div>
-            <button id="modal-close" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+            <button id="modal-close" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-gray-800/50 rounded-full p-1">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
             </button>
         </div>
@@ -508,6 +557,11 @@
         let touchStartY = 0;
         let touchMoveX = 0;
 
+        // ★ 依頼: ズーム用
+        let modalZoomLevel = 1.0;
+        const MAX_ZOOM = 10;
+        const MIN_ZOOM = 0.5;
+
 
         // --- DOM ELEMENTS ---
         const sidebar = document.getElementById('sidebar');
@@ -546,6 +600,12 @@
         const modalClose = document.getElementById('modal-close');
         const modalEdit = document.getElementById('modal-edit'); // ★ 追加
         
+        // ★ 依頼: ズーム用DOM
+        const modalImageWrapper = document.getElementById('modal-image-wrapper');
+        const modalZoomIn = document.getElementById('modal-zoom-in');
+        const modalZoomOut = document.getElementById('modal-zoom-out');
+        const modalZoomReset = document.getElementById('modal-zoom-reset');
+
         const editButton = document.getElementById('edit-button');
         const closeImageButton = document.getElementById('close-image-button'); // ★ 追加
         const optionsToolbar = document.getElementById('options-toolbar');
@@ -976,6 +1036,7 @@
         }
 
         // --- EVENT LISTENERS ---
+        // ★ 依頼: ズームリスナー追加
         function initListeners() {
             // ★ 認証フォーム
             authForm.addEventListener('submit', handleAuthSubmit);
@@ -992,6 +1053,11 @@
             modalRegenerate.addEventListener('click', handleModalRegenerate);
             modalEdit.addEventListener('click', handleModalEdit); // ★ 追加
 
+            // ★ 依頼: ズームボタンリスナー
+            modalZoomIn.addEventListener('click', handleZoomIn);
+            modalZoomOut.addEventListener('click', handleZoomOut);
+            modalZoomReset.addEventListener('click', handleZoomReset);
+            
             // ★ 依頼①: リスナー追加
             editWithFlashButton.addEventListener('click', () => toggleEditMode(true)); 
             
@@ -1460,6 +1526,7 @@
         // --- MODAL & TOAST functions ---
         
         // ★ 変更: base64 (raw) もデータセットに保存
+        // ★ 依頼: ズームリセット処理を追加
         function showImageInModal(base64DataUrl, prompt, translatedPrompt, rawBase64) {
             modalImage.src = base64DataUrl;
             modalPrompt.textContent = translatedPrompt || prompt;
@@ -1467,6 +1534,10 @@
             modalRegenerate.dataset.translatedPrompt = translatedPrompt;
             modalEdit.dataset.base64 = rawBase64; // ★ Raw Base64
             modalEdit.dataset.prompt = prompt; // ★ 元のプロンプト
+            
+            // ★ 依頼: モーダル表示時にズームをリセット
+            handleZoomReset();
+
             imageModal.classList.add('flex');
         }
         
@@ -1494,6 +1565,44 @@
             loadUploadedImage(`data:image/png;base64,${base64}`, prompt);
             imageModal.classList.remove('flex');
         }
+
+        // --- ★ 依頼: ズームハンドラ関数 ---
+        
+        function handleZoomIn() {
+            modalZoomLevel = Math.min(modalZoomLevel * 1.5, MAX_ZOOM);
+            updateZoom();
+        }
+
+        function handleZoomOut() {
+            modalZoomLevel = Math.max(modalZoomLevel / 1.5, MIN_ZOOM);
+            updateZoom();
+        }
+
+        function handleZoomReset() {
+            modalZoomLevel = 1.0;
+            updateZoom();
+            // ★ ズームリセット時にスクロール位置もリセット
+            if (modalImageWrapper) {
+                modalImageWrapper.scrollTop = 0;
+                modalImageWrapper.scrollLeft = 0;
+            }
+        }
+
+        function updateZoom() {
+            if (modalImage) {
+                modalImage.style.transform = `scale(${modalZoomLevel})`;
+                
+                // ズームレベルが1より大きい場合、画像のスタイルを変更して
+                // コンテナ内で正しく表示・スクロールできるようにする
+                if (modalZoomLevel > 1) {
+                    modalImage.classList.remove('max-w-full', 'max-h-full', 'object-contain');
+                } else {
+                    modalImage.classList.add('max-w-full', 'max-h-full', 'object-contain');
+                }
+            }
+        }
+        // ------------------------------------
+
 
         // ★ 変更: showToast (エラー時は自動で消えない)
         function showToast(message, type = "success") {
