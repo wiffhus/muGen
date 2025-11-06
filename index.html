@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<!-- [変更] h-full を追加 (依頼③) -->
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,12 +11,10 @@
         /* Inter Font (Mac-like) */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
-        body {
+        /* ★ 変更: html, body に overscroll-behavior を設定 */
+        html, body {
             font-family: 'Inter', sans-serif;
-            overscroll-behavior: none;
-            /* [変更] h-screen (100vh) を h-full (100%) にするため、
-               JSで高さを設定するまでの間のフォールバック (依頼③) */
-            height: 100vh; 
+            overscroll-behavior: none; /* スワイプでの「戻る」や「更新」を無効化 */
         }
 
         /* Custom scrollbar for sidebar */
@@ -97,6 +94,12 @@
         .modal.flex {
             display: flex;
         }
+        
+        /* ★ 追加: 認証モーダルは z-index を最上位(60)に */
+        #auth-modal {
+            z-index: 60;
+        }
+
 
         /* Tooltip */
         [data-tooltip] {
@@ -174,12 +177,11 @@
 
     </style>
 </head>
-<!-- [変更] h-screen -> h-full (依頼③) -->
-<body class="bg-gray-900 text-gray-100 h-full w-screen overflow-hidden flex">
+<!-- ★ 変更: h-screen w-screen overflow-hidden を削除し、min-h-screen を追加 -->
+<body class="bg-gray-900 text-gray-100 min-h-screen w-screen flex">
 
     <!-- (Omitted: Inline SVG Icons Definition for brevity) -->
     <svg width="0" height="0" class="hidden">
-        <!-- ... (既存のSVGアイコン定義は変更なし) ... -->
         <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-menu">
             <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
         </symbol>
@@ -223,11 +225,14 @@
         <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-x-circle">
             <circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>
         </symbol>
+        <!-- ★ 追加: パスワード/ロックアイコン (Lock) -->
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-lock">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </symbol>
     </svg>
 
-    <!-- ★ 変更: サイドバー 初期状態を md:translate-x-0 (PC表示) に -->
-    <!-- [変更なし] サイドバーは既存のまま -->
-    <aside id="sidebar" class="bg-gray-800 h-full w-64 p-4 flex flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
+    <!-- ★ 変更: h-full を h-screen (ビューポート高) に変更し、スマホでの高さを確保 -->
+    <aside id="sidebar" class="bg-gray-800 h-screen w-64 p-4 flex flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-xl font-bold text-white">muGen History</h1>
             <!-- ★ 変更: md:hidden (スマホ専用クローズ) -->
@@ -258,8 +263,8 @@
         </div>
     </aside>
 
-    <!-- [変更] h-full -> h-full min-h-0 (依頼③) -->
-    <main id="main-content" class="flex-1 h-full min-h-0 flex flex-col transition-all duration-300 ease-in-out md:ml-64">
+    <!-- ★ 変更: h-full を削除し、min-h-screen を追加 (フッター固定のため) -->
+    <main id="main-content" class="flex-1 flex flex-col transition-all duration-300 ease-in-out md:ml-64 min-h-screen">
         
         <header class="flex-shrink-0 bg-gray-900/70 backdrop-blur-sm h-16 flex items-center px-6 shadow-md z-20">
             <!-- ★ 変更: md:hidden を削除し、トグルボタンに -->
@@ -277,8 +282,8 @@
             </div>
         </header>
 
-        <!-- [変更] overflow-hidden -> overflow-y-auto min-h-0 (依頼③) -->
-        <div class="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-y-auto min-h-0">
+        <!-- ★ 変更: h-full を削除。IDを追加。padding-bottomはJSで制御 -->
+        <div id="image-container" class="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-hidden">
             <!-- ★ 変更: ドラッグ＆ドロップとファイル入力対応 -->
             <div id="image-display" class="w-full h-full max-w-3xl max-h-[70vh] flex items-center justify-center bg-gray-800 rounded-lg shadow-inner relative border-2 border-transparent transition-all">
                 <img id="generated-image" src="" alt="Generated Image" class="hidden max-w-full max-h-full object-contain rounded-lg">
@@ -311,8 +316,9 @@
             </div>
         </div>
 
-        <!-- Prompt Input Area (変更なし、flex-shrink-0 により下部固定) -->
-        <footer class="flex-shrink-0 p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm z-10">
+        <!-- ★ 変更: Prompt Input Area (Footer) -->
+        <!-- ID追加, flex-shrink-0 削除, fixed, bottom-0, w-full, z-10, md:left-64, transition-all 追加 -->
+        <footer id="prompt-footer" class="p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm z-10 fixed bottom-0 w-full md:left-64 transition-all duration-300 ease-in-out">
             <form id="generation-form" class="max-w-4xl mx-auto">
                 <!-- Options Toolbar -->
                 <!-- ★ 変更: ツールバー自体は常に flex -->
@@ -399,7 +405,6 @@
 
     <!-- (Omitted: Image Modal for brevity) -->
     <div id="image-modal" class="modal">
-        <!-- ... (変更なし) ... -->
         <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col p-4">
             <img id="modal-image" src="" class="max-w-full max-h-[70vh] object-contain mx-auto">
             <div class="p-4 bg-gray-900 rounded-b-lg mt-4">
@@ -429,7 +434,6 @@
 
     <!-- ★ 変更: トースト/エラー表示のHTML構造 -->
     <div id="toast" class="fixed top-20 right-6 text-white py-3 px-4 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50">
-        <!-- ... (変更なし) ... -->
         <div class="flex items-start justify-between">
             <p id="toast-message" class="flex-1 pr-4">Message</p>
             <div class="flex flex-col space-y-1">
@@ -442,24 +446,20 @@
             </div>
         </div>
     </div>
-
-    <!-- [新規追加] パスワード認証モーダル (依頼①) -->
-    <div id="password-modal" class="modal z-[100]"> <!-- z-indexを最前面に -->
+    
+    <!-- ★ 追加: パスワード認証モーダル -->
+    <div id="auth-modal" class="modal flex"> <!-- 初期表示を flex に -->
         <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
-            <h2 class="text-lg font-semibold text-white mb-4">Authentication Required</h2>
-            <p class="text-sm text-gray-300 mb-4">Please enter the password to use muGen.</p>
-            
-            <form id="password-form">
-                <div>
-                    <label for="password-input" class="sr-only">Password</label>
-                    <input type="password" id="password-input" class="block w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Password" required>
-                </div>
-                
-                <!-- エラーメッセージ表示領域 -->
-                <p id="password-error" class="text-red-400 text-sm mt-2"></p>
-                
-                <button id="password-submit" type="submit" class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition">
-                    Unlock
+            <div class="flex items-center justify-center mb-4">
+                <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-lock"></use></svg>
+                <h2 class="text-xl font-bold text-white ml-2">Authentication Required</h2>
+            </div>
+            <p class="text-gray-400 text-center text-sm mb-4">Please enter the password to access muGen.</p>
+            <form id="auth-form">
+                <input type="password" id="auth-password" class="block w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Password" required>
+                <p id="auth-error" class="text-red-400 text-sm mt-2 hidden"></p>
+                <button id="auth-submit" type="submit" class="w-full mt-4 p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium">
+                    Login
                 </button>
             </form>
         </div>
@@ -491,11 +491,11 @@
         let currentFetchController = null;
         // ★ 追加: トーストのタイマー
         let toastTimeoutId = null;
-
-        // [新規追加] スワイプ状態管理 (依頼②)
+        
+        // ★ 追加: スワイプ検出用
         let touchStartX = 0;
-        let touchStartY = 0; // 上下スクロールの誤爆防止用
-        let touchCurrentX = 0;
+        let touchStartY = 0;
+        let touchMoveX = 0;
 
 
         // --- DOM ELEMENTS ---
@@ -505,6 +505,10 @@
         const sidebarToggleButton = document.getElementById('sidebar-toggle-button');
         const closeSidebarBtn = document.getElementById('close-sidebar');
         
+        // ★ 追加: レイアウト調整用
+        const imageContainer = document.getElementById('image-container');
+        const promptFooter = document.getElementById('prompt-footer');
+
         const generationForm = document.getElementById('generation-form');
         const promptInput = document.getElementById('prompt-input');
         const translateButton = document.getElementById('translate-button');
@@ -564,104 +568,84 @@
         const toastClose = document.getElementById('toast-close');
         const toastCopy = document.getElementById('toast-copy');
 
-        // [新規追加] パスワードモーダル (依頼①)
-        const passwordModal = document.getElementById('password-modal');
-        const passwordForm = document.getElementById('password-form');
-        const passwordInput = document.getElementById('password-input');
-        const passwordError = document.getElementById('password-error');
-        const passwordSubmit = document.getElementById('password-submit');
+        // ★ 追加: 認証モーダル
+        const authModal = document.getElementById('auth-modal');
+        const authForm = document.getElementById('auth-form');
+        const authPassword = document.getElementById('auth-password');
+        const authSubmit = document.getElementById('auth-submit');
+        const authError = document.getElementById('auth-error');
 
 
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
-            initViewport(); // [新規追加] (依頼③)
-            checkAuth(); // [新規追加] (依頼①)
+            // ★ 認証チェックを最初に行う
+            checkAuth(); 
+            
             initDB();
             initSidebar();
             initStyles();
             initListeners();
             loadHistory();
+            
+            // ★ 追加: フッターパディングの初期設定
+            adjustMainContentPadding();
         });
+
+        // --- ★ 追加: AUTHENTICATION ---
         
-        // --- [新規追加] Viewport Height (依頼③) ---
         /**
-         * スマホのブラウザUI（検索バー）による高さ変動に対応
-         * body の高さを window.innerHeight に動的に設定する
-         */
-        function initViewport() {
-            const setVh = () => {
-                // window.innerHeight を取得して body の高さに設定
-                document.body.style.height = `${window.innerHeight}px`;
-            };
-            
-            setVh(); // 初期実行
-            
-            // リサイズイベント（回転、UIの表示/非表示）に対応
-            window.addEventListener('resize', setVh);
-        }
-        
-        // --- [新規追加] Authentication (依頼①) ---
-        /**
-         * sessionStorage を確認し、未認証ならモーダルを表示
+         * セッションストレージをチェックし、未認証ならモーダルを表示
          */
         function checkAuth() {
-            if (sessionStorage.getItem('muGenAuth') === 'true') {
-                console.log("Already authenticated.");
+            if (sessionStorage.getItem('muGenAuthenticated') === 'true') {
+                authModal.classList.remove('flex'); // 認証済みなら非表示
             } else {
-                // 未認証の場合、モーダルを表示
-                passwordModal.classList.add('flex');
-                passwordInput.focus();
+                authModal.classList.add('flex'); // 未認証なら表示
             }
         }
-
+        
         /**
-         * パスワードフォーム送信時の処理
+         * パスワード認証フォームの送信ハンドラ
          */
-        async function handlePasswordSubmit(event) {
+        async function handleAuthSubmit(event) {
             event.preventDefault();
-            const password = passwordInput.value;
+            const password = authPassword.value;
             if (!password) return;
 
-            // ボタンをローディング状態に
-            passwordSubmit.disabled = true;
-            passwordSubmit.textContent = 'Checking...';
-            passwordError.textContent = ''; // エラーをクリア
+            setLoading(authSubmit, true); // ボタンをローディング状態に
+            authError.classList.add('hidden');
 
             try {
                 const response = await fetch('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        action: 'authenticate',
+                        action: 'auth',
                         password: password
                     })
                 });
 
                 if (response.ok) {
-                    // 認証成功
-                    sessionStorage.setItem('muGenAuth', 'true');
-                    passwordModal.classList.remove('flex');
-                    showToast("Authentication successful", "success");
+                    sessionStorage.setItem('muGenAuthenticated', 'true');
+                    authModal.classList.remove('flex');
+                    showToast("Authentication successful!", "success");
                 } else {
-                    // 認証失敗
                     const data = await response.json();
-                    throw new Error(data.error || 'Authentication failed');
+                    throw new Error(data.error || "Authentication failed");
                 }
-
             } catch (error) {
                 console.error("Auth error:", error);
-                passwordError.textContent = error.message;
+                authError.textContent = error.message;
+                authError.classList.remove('hidden');
+                showToast(error.message, "error");
             } finally {
-                // ボタンの状態を元に戻す
-                passwordSubmit.disabled = false;
-                passwordSubmit.textContent = 'Unlock';
+                setLoading(authSubmit, false);
             }
         }
 
 
         // --- (Omitted: IndexedDB functions for brevity) ---
         function initDB() {
-            // ... (変更なし)
             const request = indexedDB.open("muGenDB", 1);
 
             request.onerror = (event) => {
@@ -689,7 +673,6 @@
 
         // ★ 変更: モデル情報、アスペクト比、スタイルを保存
         function saveImageToDB(prompt, translatedPrompt, base64Data, model, aspectRatio, styles) {
-            // ... (変更なし)
             if (!db) return;
             const transaction = db.transaction(["images"], "readwrite");
             const objectStore = transaction.objectStore("images");
@@ -719,7 +702,6 @@
 
         // ★ 変更: 統計情報を計算して表示 + マーキー情報
         function loadHistory() {
-            // ... (変更なし)
             if (!db) return;
             const transaction = db.transaction(["images"], "readonly");
             const objectStore = transaction.objectStore("images");
@@ -805,7 +787,6 @@
         }
         
         function clearOldHistory() {
-            // ... (変更なし)
             if (!db) return;
             const transaction = db.transaction(["images"], "readwrite");
             const objectStore = transaction.objectStore("images");
@@ -817,34 +798,48 @@
 
         // --- UI INITIALIZATION ---
 
-        // ★ 変更: サイドバートグルロジック (PC/スマホ共通)
+        // ★ 変更: サイドバートグルロジック (PC/スマホ共通) + フッター位置制御
         function initSidebar() {
-            // ... (変更なし)
-            sidebarToggleButton.addEventListener('click', () => {
-                // サイドバーが開いているか (translate-x-full が *ない* か)
-                const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
-
-                if (isSidebarOpen) {
-                    // 閉じる
-                    sidebar.classList.add('-translate-x-full');
-                    sidebar.classList.remove('md:translate-x-0'); // PC用の表示クラスも削除
-                    mainContent.classList.remove('md:ml-64'); // PC用のマージン削除
-                } else {
-                    // 開く
-                    sidebar.classList.remove('-translate-x-full');
-                    sidebar.classList.add('md:translate-x-0'); // PC用の表示クラス追加
-                    mainContent.classList.add('md:ml-64'); // PC用のマージン追加
-                }
-            });
-            
-            // スマホ用クローズボタン (変更なし)
-            closeSidebarBtn.addEventListener('click', () => {
-                sidebar.classList.add('-translate-x-full');
-            });
+            sidebarToggleButton.addEventListener('click', toggleSidebar);
+            closeSidebarBtn.addEventListener('click', () => toggleSidebar(false)); // スマホ用は強制的に閉じる
         }
 
+        /**
+         * ★ 新規: サイドバーの開閉を制御する関数
+         * @param {boolean} [forceOpen] - 指定すると状態を強制 (true=開, false=閉)
+         */
+        function toggleSidebar(forceOpen) {
+            // サイドバーが開いているか (translate-x-full が *ない* か)
+            const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
+            
+            let shouldBeOpen;
+            if (forceOpen === true) {
+                shouldBeOpen = true;
+            } else if (forceOpen === false) {
+                shouldBeOpen = false;
+            } else {
+                shouldBeOpen = !isSidebarOpen; // 指定がなければトグル
+            }
+
+            if (!shouldBeOpen) {
+                // 閉じる
+                sidebar.classList.add('-translate-x-full');
+                sidebar.classList.remove('md:translate-x-0'); // PC用の表示クラスも削除
+                mainContent.classList.remove('md:ml-64'); // PC用のマージン削除
+                // ★ フッターの位置を左端に戻す
+                promptFooter.classList.remove('md:left-64'); 
+            } else {
+                // 開く
+                sidebar.classList.remove('-translate-x-full');
+                sidebar.classList.add('md:translate-x-0'); // PC用の表示クラス追加
+                mainContent.classList.add('md:ml-64'); // PC用のマージン追加
+                // ★ フッターの位置をサイドバー分ずらす
+                promptFooter.classList.add('md:left-64'); 
+            }
+        }
+
+
         function initStyles() {
-            // ... (変更なし)
             const container = document.getElementById('styles-container');
             STYLES.forEach(style => {
                 const div = document.createElement('div');
@@ -861,6 +856,9 @@
 
         // --- EVENT LISTENERS ---
         function initListeners() {
+            // ★ 認証フォーム
+            authForm.addEventListener('submit', handleAuthSubmit);
+
             generationForm.addEventListener('submit', handleGenerationSubmit);
             translateButton.addEventListener('click', handleTranslate);
             
@@ -881,17 +879,17 @@
             toastCopy.addEventListener('click', () => copyToastMessage());
 
             modelSelect.addEventListener('change', () => {
-                // ... (変更なし)
+                // ★ 変更: 編集モード中に Imagen を選んだら編集モード解除
                 if (modelSelect.value === 'imagen-3.0-generate' && isEditingMode) {
                     toggleEditMode(false);
                 }
+                // ★ 変更: Gemini を選んだら（画像があれば）編集モード移行
                 if (modelSelect.value === 'gemini-2.5-flash-image-preview' && currentEditImageBase64) {
                     toggleEditMode(true);
                 }
             });
             
             autoRetrySelect.addEventListener('change', () => {
-                // ... (変更なし)
                 if(autoRetrySelect.value === '-1') {
                     const customRetry = prompt("Enter number of retries:", "15");
                     if (customRetry && !isNaN(parseInt(customRetry))) {
@@ -916,71 +914,89 @@
             uploadImageButton.addEventListener('click', () => uploadImageInput.click());
             uploadImageInput.addEventListener('change', handleFileSelect);
 
-            // [新規追加] パスワードフォームリスナー (依頼①)
-            passwordForm.addEventListener('submit', handlePasswordSubmit);
-            
-            // [新規追加] スワイプコントロールリスナー (依頼②)
-            initSwipeControls();
-        }
+            // ★ 追加: スマホ用レイアウト調整リスナー
+            window.addEventListener('resize', adjustMainContentPadding);
 
-        // --- [新規追加] Swipe Controls (依頼②) ---
-        function initSwipeControls() {
+            // ★ 追加: スワイプイベントリスナー
             document.addEventListener('touchstart', handleTouchStart, { passive: true });
             document.addEventListener('touchmove', handleTouchMove, { passive: true });
             document.addEventListener('touchend', handleTouchEnd, { passive: true });
         }
-
-        function handleTouchStart(e) {
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-            touchCurrentX = touchStartX;
-        }
-
-        function handleTouchMove(e) {
-            // スワイプ中のX座標を記録 (Y座標は touchend で比較)
-            touchCurrentX = e.touches[0].clientX;
-        }
-
-        function handleTouchEnd(e) {
-            const touchEndX = e.changedTouches[0].clientX;
-            const touchEndY = e.changedTouches[0].clientY;
-            
-            const deltaX = touchEndX - touchStartX;
-            const deltaY = touchEndY - touchStartY;
-
-            // 上下スクロールを優先 (Yの移動量がXより大きい場合はスワイプとみなさない)
-            if (Math.abs(deltaY) > Math.abs(deltaX)) {
-                return;
-            }
-
-            const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
-
-            // 1. 左端からの右スワイプ (サイドバーを開く)
-            // (開始位置が画面の左端 50px 以内、かつ 50px 以上右にスワイプ)
-            if (touchStartX < 50 && deltaX > 50 && !isSidebarOpen) {
-                sidebar.classList.remove('-translate-x-full');
-            }
-
-            // 2. サイドバーが開いているときの左スワイプ (サイドバーを閉じる)
-            // (50px 以上左にスワイプ)
-            if (isSidebarOpen && deltaX < -50) {
-                sidebar.classList.add('-translate-x-full');
+        
+        // --- ★ 追加: LAYOUT ADJUSTMENT ---
+        
+        /**
+         * フッターの高さを計算し、メインコンテンツの下部パディングに設定
+         */
+        function adjustMainContentPadding() {
+            if (promptFooter && imageContainer) {
+                const footerHeight = promptFooter.offsetHeight;
+                imageContainer.style.paddingBottom = `${footerHeight + 20}px`; // フッターの高さ +α
             }
         }
         
+        // --- ★ 追加: SWIPE HANDLERS ---
+        
+        function handleTouchStart(event) {
+            // 認証モーダル表示中はスワイプ無効
+            if (authModal.classList.contains('flex')) return;
+
+            const firstTouch = event.touches[0];
+            touchStartX = firstTouch.clientX;
+            touchStartY = firstTouch.clientY;
+            touchMoveX = firstTouch.clientX; // 移動量リセット
+        }
+
+        function handleTouchMove(event) {
+            if (authModal.classList.contains('flex')) return;
+            // Y軸の移動が大きい場合はスクロールとみなし、スワイプ処理を中断
+            if (Math.abs(event.touches[0].clientX - touchStartX) < Math.abs(event.touches[0].clientY - touchStartY)) {
+                touchStartX = 0; // スワイプ開始位置をリセット
+                return;
+            }
+            touchMoveX = event.touches[0].clientX;
+        }
+
+        function handleTouchEnd() {
+            if (authModal.classList.contains('flex')) return;
+            if (touchStartX === 0) return; // スワイプ開始されていない
+
+            const deltaX = touchMoveX - touchStartX;
+            const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
+
+            // 1. 開く: 左端 (30px) から 右 (100px以上) へスワイプ
+            if (isMobile && !isSidebarOpen && touchStartX < 30 && deltaX > 100) {
+                toggleSidebar(true); // 開く
+            }
+            // 2. 閉じる: サイドバーが開いているときに 左 (-100px以上) へスワイプ
+            else if (isMobile && isSidebarOpen && deltaX < -100) {
+                toggleSidebar(false); // 閉じる
+            }
+            
+            // リセット
+            touchStartX = 0;
+            touchStartY = 0;
+            touchMoveX = 0;
+        }
+
+
         // --- CORE LOGIC ---
 
         function toggleStylesAccordion() {
-            // ... (変更なし)
             stylesContainer.classList.toggle('hidden');
             stylesChevron.classList.toggle('rotate-180');
         }
 
         function handlePromptKeydown(event) {
-            // ... (変更なし)
             if (isMobile) {
-                return; // モバイルでは無効
+                // ★ モバイルの場合: Shift+Enter で改行、Enterのみで送信
+                if (event.key === 'Enter' && !event.shiftKey) {
+                     event.preventDefault();
+                     handleGenerationSubmit(new Event('submit'));
+                }
+                return;
             }
+            // PC (ダブルエンター)
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault(); 
                 const now = new Date().getTime();
@@ -1004,7 +1020,6 @@
 
         // ★ 追加: 画像クローズ処理
         function closeImage() {
-            // ... (変更なし)
             generatedImage.src = "";
             generatedImage.classList.add('hidden');
             placeholder.style.display = 'flex'; // 'flex'に戻す
@@ -1018,7 +1033,6 @@
 
         // ★ 変更: 編集モードインジケーター制御 + ツールバー制御
         function toggleEditMode(forceOn) { 
-            // ... (変更なし)
             isEditingMode = forceOn;
             
             if (isEditingMode) {
@@ -1057,6 +1071,9 @@
             }
             // ★ ボタンアイコンを更新
             setLoading(generateButton, false);
+            
+            // ★ フッターの高さが変わる可能性があるのでパディングを再調整
+            setTimeout(adjustMainContentPadding, 100);
         }
 
         async function handleTranslate() {
@@ -1105,7 +1122,6 @@
 
         // ★ 変更: キャンセル機能 + エラー時のGAS送信
         async function handleGenerationSubmit(event) {
-            // ... (変更なし)
             if (event) event.preventDefault(); 
             
             // ★ キャンセルロジック
@@ -1224,7 +1240,6 @@
         
         // ★ 変更: AbortSignal を引数に追加
         async function fetchWithRetry(url, options, retries = 0, signal = null) {
-            // ... (変更なし)
             let attempt = 0;
             const maxRetries = retries < 0 ? 0 : retries; 
 
@@ -1251,6 +1266,11 @@
                     }
                     console.warn(`Attempt ${attempt} failed:`, error.message);
                     if (attempt === maxRetries) {
+                        // ★ 認証エラー (401) の場合は、セッションをクリアしてリロード
+                        if (error.message.includes('401') || error.message.includes('Authentication failed')) {
+                            sessionStorage.removeItem('muGenAuthenticated');
+                            location.reload();
+                        }
                         throw error; 
                     }
                     attempt++;
@@ -1261,7 +1281,7 @@
 
         // ★ 追加: エラーをGASに送信する（サイレント）
         function sendErrorToGAS(payload, errorMessage) {
-            // ... (変更なし)
+            // エラー送信はバックグラウンドで試行し、失敗してもユーザーには通知しない
             fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1280,7 +1300,6 @@
         // --- ★ 追加: プロンプト入力用ヘルパー ---
 
         function handlePromptCopy() {
-            // ... (変更なし)
             const textToCopy = promptInput.value;
             if (!textToCopy) {
                 showToast("Nothing to copy", "info");
@@ -1291,7 +1310,6 @@
         }
 
         function handlePromptClear() {
-            // ... (変更なし)
             promptInput.value = "";
             showToast("Input cleared", "info");
         }
@@ -1301,7 +1319,6 @@
         
         // ★ 変更: base64 (raw) もデータセットに保存
         function showImageInModal(base64DataUrl, prompt, translatedPrompt, rawBase64) {
-            // ... (変更なし)
             modalImage.src = base64DataUrl;
             modalPrompt.textContent = translatedPrompt || prompt;
             modalRegenerate.dataset.prompt = prompt;
@@ -1313,7 +1330,6 @@
         
         // ★ 変更: クリップボードコピーのFallbackを改善
         function handleModalCopy() {
-            // ... (変更なし)
             const textToCopy = modalPrompt.textContent;
             copyToClipboard(textToCopy, "Prompt copied to clipboard!");
         }
@@ -1331,7 +1347,6 @@
 
         // ★ 追加: モーダルからの編集
         function handleModalEdit() {
-            // ... (変更なし)
             const base64 = modalEdit.dataset.base64;
             const prompt = modalEdit.dataset.prompt;
             loadUploadedImage(`data:image/png;base64,${base64}`, prompt);
@@ -1340,7 +1355,6 @@
 
         // ★ 変更: showToast (エラー時は自動で消えない)
         function showToast(message, type = "success") {
-            // ... (変更なし)
             if (toastTimeoutId) {
                 clearTimeout(toastTimeoutId);
                 toastTimeoutId = null;
@@ -1370,7 +1384,6 @@
 
         // ★ 追加: トーストを隠す
         function hideToast() {
-            // ... (変更なし)
             if (toastTimeoutId) {
                 clearTimeout(toastTimeoutId);
                 toastTimeoutId = null;
@@ -1381,14 +1394,12 @@
         
         // ★ 追加: トーストメッセージをコピー
         function copyToastMessage() {
-            // ... (変更なし)
             const textToCopy = toastMessage.textContent;
             copyToClipboard(textToCopy, "Error message copied!");
         }
 
         // ★ 汎用コピー関数
         function copyToClipboard(textToCopy, successMessage) {
-             // ... (変更なし)
              navigator.clipboard.writeText(textToCopy).then(() => {
                 showToast(successMessage, "success");
             }).catch(err => {
@@ -1415,7 +1426,18 @@
         
         // ★ 変更: アイコン切り替え (isEditingMode 対応)
         function setLoading(button, isLoading) {
-            // ... (変更なし)
+            // ★ 認証ボタンのローディング処理
+            if (button.id === 'auth-submit') {
+                if (isLoading) {
+                    button.disabled = true;
+                    button.innerHTML = '<svg class="w-5 h-5 text-white animate-spin mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-loader"></use></svg>';
+                } else {
+                    button.disabled = false;
+                    button.innerHTML = 'Login';
+                }
+                return;
+            }
+        
             if (button.id === 'generate-button') {
                 const icon = button.querySelector('svg use');
                 if (isLoading) {
@@ -1454,20 +1476,17 @@
         // --- ★ 追加: D&D / Upload Handlers ---
 
         function handleDragOver(event) {
-            // ... (変更なし)
             event.preventDefault();
             if (generationInProgress || isEditingMode) return;
             imageDisplay.classList.add('drag-over');
         }
 
         function handleDragLeave(event) {
-            // ... (変更なし)
             event.preventDefault();
             imageDisplay.classList.remove('drag-over');
         }
 
         function handleDrop(event) {
-            // ... (変更なし)
             event.preventDefault();
             imageDisplay.classList.remove('drag-over');
             if (generationInProgress) return;
@@ -1481,7 +1500,6 @@
         }
 
         function handleFileSelect(event) {
-            // ... (変更なし)
             const file = event.target.files[0];
             if (file && file.type.startsWith('image/')) {
                 readImageFile(file);
@@ -1490,7 +1508,6 @@
         }
 
         function readImageFile(file) {
-            // ... (変更なし)
             const reader = new FileReader();
             reader.onload = (e) => {
                 loadUploadedImage(e.target.result);
@@ -1507,7 +1524,6 @@
          * @param {string} [prompt] (Historyから読み込む場合の既存プロンプト)
          */
         function loadUploadedImage(base64DataUrl, prompt = "") {
-            // ... (変更なし)
             generatedImage.src = base64DataUrl;
             generatedImage.classList.remove('hidden');
             placeholder.style.display = 'none';
