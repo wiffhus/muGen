@@ -355,6 +355,8 @@
                         <select id="model-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
                             <option value="imagen-3.0-generate">Imagen 3.0</option>
                             <option value="gemini-2.5-flash-image-preview">Gemini 2.5 Flash Image</option>
+                            <!-- ★ ここに追加 -->
+                            <option value="gemini-2.0-flash-preview-image-generation">Gemini 2.0 Flash Image</option>
                         </select>
                     </div>
                     <!-- ★ 変更: ID追加 -->
@@ -380,11 +382,16 @@
                         </select>
                     </div>
                     
-                    <!-- ★ 依頼①: Edit with 2.5 flash ボタン -->
-                    <div id="edit-with-flash-group" class="flex items-end">
+                    <!-- ★ 依頼①: Edit ボタン (2.0 用追加) -->
+                    <div id="edit-with-flash-group" class="flex items-end gap-2"> <!-- ★ gap-2 追加 -->
                         <button type="button" id="edit-with-flash-button" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition flex items-center gap-2" data-tooltip="Switch to Edit Mode with Gemini 2.5 Flash">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
                             Edit with 2.5 flash
+                        </button>
+                        <!-- ★ ここに追加 -->
+                        <button type="button" id="edit-with-flash-2-0-button" class="bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition flex items-center gap-2" data-tooltip="Switch to Edit Mode with Gemini 2.0 Flash">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
+                            Edit with 2.0 flash
                         </button>
                     </div>
                 </div>
@@ -537,6 +544,7 @@
         // ★ 追加: 料金計算用 (仮の単価)
         const PRICE_IMAGEN_USD = 0.02; // Imagen 3.0 (仮)
         const PRICE_GEMINI_FLASH_IMAGE_USD = 0.002; // Gemini Flash Image (仮)
+        const PRICE_GEMINI_FLASH_IMAGE_2_0_USD = 0.002; // Gemini 2.0 (仮) ★ 追加 (2.5と同額に設定)
         const USD_JPY_RATE = 150; // 仮の為替レート
 
         let db;
@@ -617,6 +625,7 @@
 
         // ★ 依頼①: Edit ボタン
         const editWithFlashButton = document.getElementById('edit-with-flash-button');
+        const editWithFlash20Button = document.getElementById('edit-with-flash-2-0-button'); // ★ 追加
 
         // ★ Styles Accordion Elements
         const stylesToggleBtn = document.getElementById('styles-toggle');
@@ -904,11 +913,13 @@
 
                         historyContainer.appendChild(div);
 
-                        // ★ 料金計算
+                        // ★ 料金計算 (2.0 のロジック追加)
                         if (item.model === 'imagen-3.0-generate') {
                             totalCostUSD += PRICE_IMAGEN_USD;
                         } else if (item.model === 'gemini-2.5-flash-image-preview') {
                             totalCostUSD += PRICE_GEMINI_FLASH_IMAGE_USD;
+                        } else if (item.model === 'gemini-2.0-flash-preview-image-generation') { // ★ 追加
+                            totalCostUSD += PRICE_GEMINI_FLASH_IMAGE_2_0_USD;
                         } else {
                             // モデル情報がない古いデータ (仮にImagen扱い)
                             totalCostUSD += PRICE_IMAGEN_USD;
@@ -1037,6 +1048,7 @@
 
         // --- EVENT LISTENERS ---
         // ★ 依頼: ズームリスナー追加
+        // ★ 修正: 2.0 ボタンのリスナー追加
         function initListeners() {
             // ★ 認証フォーム
             authForm.addEventListener('submit', handleAuthSubmit);
@@ -1059,9 +1071,10 @@
             modalZoomReset.addEventListener('click', handleZoomReset);
             
             // ★ 依頼①: リスナー追加
-            editWithFlashButton.addEventListener('click', () => toggleEditMode(true)); 
+            editWithFlashButton.addEventListener('click', () => toggleEditMode(true, 'gemini-2.5-flash-image-preview')); // ★ 修正 (モデル名を明示)
+            editWithFlash20Button.addEventListener('click', () => toggleEditMode(true, 'gemini-2.0-flash-preview-image-generation')); // ★ 追加
             
-            editButton.addEventListener('click', () => toggleEditMode(true)); 
+            editButton.addEventListener('click', () => toggleEditMode(true)); // ★ 修正 (引数なしで呼び、デフォルト(2.5)を使う)
             closeImageButton.addEventListener('click', closeImage); // ★ 追加
             
             // ★ 追加: トーストボタン
@@ -1073,9 +1086,9 @@
                 if (modelSelect.value === 'imagen-3.0-generate' && isEditingMode) {
                     toggleEditMode(false);
                 }
-                // ★ 変更: Gemini を選んだら（画像があれば）編集モード移行
-                if (modelSelect.value === 'gemini-2.5-flash-image-preview' && currentEditImageBase64) {
-                    toggleEditMode(true);
+                // ★ 変更: Gemini (2.5 or 2.0) を選んだら（画像があれば）編集モード移行
+                if ((modelSelect.value === 'gemini-2.5-flash-image-preview' || modelSelect.value === 'gemini-2.0-flash-preview-image-generation') && currentEditImageBase64) { // ★ 2.0 を追加
+                    toggleEditMode(true, modelSelect.value); // ★ 選択したモデルで編集モードに
                 }
             });
             
@@ -1223,7 +1236,8 @@
 
         // ★ 変更: 編集モードインジケーター制御 + ツールバー制御
         // ★ 依頼②: autoRetryGroup の非表示を解除
-        function toggleEditMode(forceOn) { 
+        // ★ 修正: 引数 model を追加 (デフォルトは 2.5)
+        function toggleEditMode(forceOn, model = 'gemini-2.5-flash-image-preview') { 
             isEditingMode = forceOn;
             
             if (isEditingMode) {
@@ -1232,7 +1246,7 @@
                     isEditingMode = false;
                     return;
                 }
-                modelSelect.value = 'gemini-2.5-flash-image-preview';
+                modelSelect.value = model; // ★ 引数で指定されたモデルを設定
                 promptInput.placeholder = "Enter edit instructions (e.g., 'make the sky blue', 'add a hat')...";
                 
                 // ★ 変更: ツールバーの項目を個別に制御
@@ -1249,6 +1263,10 @@
                 if (!stylesContainer.classList.contains('hidden')) {
                     toggleStylesAccordion();
                 }
+                
+                // ★ 修正: インジケーターのテキストを動的に
+                const modelName = model.includes('2.0') ? 'Gemini 2.0' : 'Gemini 2.5';
+                editModeIndicator.textContent = `🎨 Editing Mode (${modelName}) - Subsequent generations will edit the current image. (Change model to Imagen 3.0 to exit)`;
                 editModeIndicator.classList.remove('hidden'); // ★ インジケーター表示
             } else {
                 modelSelect.value = 'imagen-3.0-generate';
@@ -1405,8 +1423,8 @@
                     if (!isEditingMode) {
                          // もし（アップロードなどで）編集モードになっていなかったら、
                          // 編集可能なモデルで生成した場合は編集モードに入る
-                         if (model === 'gemini-2.5-flash-image-preview') {
-                            toggleEditMode(true);
+                         if (model === 'gemini-2.5-flash-image-preview' || model === 'gemini-2.0-flash-preview-image-generation') {
+                            toggleEditMode(true, model); // ★ 2.0/2.5 に対応
                          }
                     }
 
