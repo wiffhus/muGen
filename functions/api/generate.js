@@ -5,8 +5,9 @@
  */
 
 const IMAGEN_API_URL_PREDICT = "https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict";
-// ★ 変更: モデル名を 'gemini-2.5-flash-image-preview' に
-const GEMINI_API_URL_FLASH_IMAGE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent";
+// ★ 変更: 2.5 と 2.0 の両方を定義
+const GEMINI_API_URL_FLASH_IMAGE_2_5 = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent";
+const GEMINI_API_URL_FLASH_IMAGE_2_0 = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent"; // ★ 追加
 const GEMINI_API_URL_FLASH = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
 
 
@@ -21,8 +22,9 @@ function getApiKey(context, model, keyIndex) {
     
     let apiKeyEnvVar;
     
-    // ★ 変更: モデルに応じてキー変数を切り替え
-    if (model === 'gemini-2.5-flash-image-preview') {
+    // ★ 変更: モデルに応じてキー変数を切り替え (2.0 を追加)
+    if (model === 'gemini-2.5-flash-image-preview' || model === 'gemini-2.0-flash-preview-image-generation') {
+        // 2.5 と 2.0 は同じキープール (GEMINI_FLASH_IMAGE_API_KEY_XX) を使用
         apiKeyEnvVar = `GEMINI_FLASH_IMAGE_API_KEY_${keyIndexStr}`;
     } else {
         // デフォルト (Imagen / Translate)
@@ -79,15 +81,15 @@ export async function onRequest(context) {
             case 'generate':
                 if (model === 'imagen-3.0-generate') {
                     response = await handleGenerate(data, apiKey, context);
-                } else if (model === 'gemini-2.5-flash-image-preview') {
-                    // Gemini Flash Image も 'generate' アクションとして扱われる (編集モードでない場合)
+                } else if (model === 'gemini-2.5-flash-image-preview' || model === 'gemini-2.0-flash-preview-image-generation') { // ★ 2.0 を追加
+                    // Gemini Flash Image (2.5 or 2.0) も 'generate' アクションとして扱われる (編集モードでない場合)
                     response = await handleEdit(data, apiKey, context); // 編集用関数を流用
                 } else {
                     response = new Response(JSON.stringify({ error: 'Invalid model for generation' }), { status: 400 });
                 }
                 break;
             case 'edit':
-                 if (model === 'gemini-2.5-flash-image-preview') {
+                 if (model === 'gemini-2.5-flash-image-preview' || model === 'gemini-2.0-flash-preview-image-generation') { // ★ 2.0 を追加
                     response = await handleEdit(data, apiKey, context);
                 } else {
                     response = new Response(JSON.stringify({ error: 'Invalid model for editing' }), { status: 400 });
@@ -267,7 +269,7 @@ async function handleGenerate(data, apiKey, context) {
 }
 
 /**
- * Edits (or generates) an image using Gemini 2.5 Flash Image
+ * Edits (or generates) an image using Gemini Flash Image (2.5 or 2.0)
  */
 async function handleEdit(data, apiKey, context) {
     // ★ 修正: aspectRatio と model を data から取得
@@ -276,7 +278,14 @@ async function handleEdit(data, apiKey, context) {
     // 'edit' (baseImageあり) or 'generate' (baseImageなし)
     const isEditMode = !!baseImage;
 
-    const apiUrl = `${GEMINI_API_URL_FLASH_IMAGE}?key=${apiKey}`;
+    // ★ 変更: モデルに応じて API URL を切り替え
+    let apiUrl;
+    if (model === 'gemini-2.0-flash-preview-image-generation') {
+        apiUrl = `${GEMINI_API_URL_FLASH_IMAGE_2_0}?key=${apiKey}`;
+    } else {
+        // デフォルト (gemini-2.5-flash-image-preview)
+        apiUrl = `${GEMINI_API_URL_FLASH_IMAGE_2_5}?key=${apiKey}`;
+    }
     
     // ユーザーが送信するパーツ
     const userParts = [{ text: prompt }];
@@ -364,3 +373,37 @@ async function handleEdit(data, apiKey, context) {
     });
 }
 
+
+/**
+ * ★ 追加: エラーをGASに記録する
+ */
+async function handleErrorLog(data, context) {
+    const { prompt, model, error } = data;
+    const gasUrl = context.env.GAS_WEB_APP_URL;
+
+    if (!gasUrl) {
+        console.warn("GAS_WEB_APP_URL is not set. Error logging failed.");
+        return new Response(JSON.stringify({ error: 'GAS URL not configured' }), { status: 500 });
+    }
+
+    // GASに送信するデータ (エラーフラグを立てる)
+    const saveData = {
+        prompt: prompt,
+        translatedPrompt: `[ERROR] ${error}`,
+        base64Data: "ERROR", // エラーを示すダミーデータ
+        model: model,
+        isError: true // エラーであることを明記
+    };
+
+    try {
+        await fetch(gasUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(saveData)
+        });
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+    } catch (err) {
+        console.error("GAS error logging failed:", err);
+        return new Response(JSON.stringify({ error: 'Failed to log error to GAS' }), { status: 500 });
+    }
+}
