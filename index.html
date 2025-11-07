@@ -1300,7 +1300,7 @@
                 // ★ 変更: 翻訳キャンセル用の AbortController
                 const controller = new AbortController();
                 // 翻訳ボタン自体をキャンセル可能にはしないが、万が一のタイムアウト用
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒タイムアウト
+                const timeoutId = setTimeout(() => controller.abort(), 100000); 
 
                 const response = await fetchWithRetry('/api/generate', {
                     method: 'POST',
