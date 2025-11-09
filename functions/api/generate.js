@@ -4,7 +4,9 @@
  * Deployed at /functions/api/generate.js
  */
 
-const IMAGEN_API_URL_PREDICT = "https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict";
+// ★ 削除: 固定URL定義を削除
+// const IMAGEN_API_URL_PREDICT = "https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict";
+
 // ★ 変更: 2.5 と 2.0 の両方を定義
 const GEMINI_API_URL_FLASH_IMAGE_2_5 = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent";
 const GEMINI_API_URL_FLASH_IMAGE_2_0 = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent"; // ★ 追加
@@ -28,6 +30,7 @@ function getApiKey(context, model, keyIndex) {
         apiKeyEnvVar = `GEMINI_FLASH_IMAGE_API_KEY_${keyIndexStr}`;
     } else {
         // デフォルト (Imagen / Translate)
+        // ★ Imagen 4.0 もこちら (GEMINI_API_KEY_XX) を使用する
         apiKeyEnvVar = `GEMINI_API_KEY_${keyIndexStr}`;
     }
 
@@ -78,8 +81,11 @@ export async function onRequest(context) {
                 const translateApiKey = getApiKey(context, 'default', keyIndex);
                 response = await handleTranslate(data, translateApiKey);
                 break;
+            
+            // ★★★ 修正箇所 ★★★
             case 'generate':
-                if (model === 'imagen-3.0-generate') {
+                // ★ 変更: 'predict' を使うモデル (Imagen系) かどうかで分岐
+                if (model.startsWith('imagen-')) {
                     response = await handleGenerate(data, apiKey, context);
                 } else if (model === 'gemini-2.5-flash-image-preview' || model === 'gemini-2.0-flash-preview-image-generation') { // ★ 2.0 を追加
                     // Gemini Flash Image (2.5 or 2.0) も 'generate' アクションとして扱われる (編集モードでない場合)
@@ -88,6 +94,8 @@ export async function onRequest(context) {
                     response = new Response(JSON.stringify({ error: 'Invalid model for generation' }), { status: 400 });
                 }
                 break;
+            // ★★★ 修正箇所ここまで ★★★
+
             case 'edit':
                  if (model === 'gemini-2.5-flash-image-preview' || model === 'gemini-2.0-flash-preview-image-generation') { // ★ 2.0 を追加
                     response = await handleEdit(data, apiKey, context);
@@ -196,8 +204,9 @@ async function handleTranslate(data, apiKey) {
     });
 }
 
+// ★★★ 修正箇所 ★★★
 /**
- * Generates an image using Imagen 3.0
+ * Generates an image using Imagen 3.0 or 4.0
  */
 async function handleGenerate(data, apiKey, context) {
     // ★ 修正: model を data から取得
@@ -209,7 +218,16 @@ async function handleGenerate(data, apiKey, context) {
         enhancedPrompt += `, ${styles.join(', ')} style`;
     }
 
-    const apiUrl = `${IMAGEN_API_URL_PREDICT}?key=${apiKey}`;
+    // ★ 追加: モデル名に基づいて API URL を動的に構築
+    let apiModelName = model;
+    // フロントから 'imagen-3.0-generate' が送られてきた場合、
+    // 既存の動作（002）にマッピングする
+    if (model === 'imagen-3.0-generate') {
+        apiModelName = 'imagen-3.0-generate-002';
+    }
+    // 他の imagen- (4.0など) は、フロントから渡された value (例: 'imagen-4.0-ultra-generate-preview-06-06') をそのまま使用する
+
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModelName}:predict?key=${apiKey}`;
     
     const payload = {
         instances: {
@@ -251,7 +269,7 @@ async function handleGenerate(data, apiKey, context) {
             prompt: prompt,
             translatedPrompt: enhancedPrompt, 
             base64Data: base64,
-            model: model 
+            model: model // ★ フロントから渡された元のモデル名 (例: 'imagen-3.0-generate') を保存
         };
         context.waitUntil(
             fetch(gasUrl, {
@@ -267,6 +285,7 @@ async function handleGenerate(data, apiKey, context) {
         headers: { 'Content-Type': 'application/json' },
     });
 }
+// ★★★ 修正箇所ここまで ★★★
 
 /**
  * Edits (or generates) an image using Gemini Flash Image (2.5 or 2.0)
