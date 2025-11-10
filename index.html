@@ -276,6 +276,17 @@
         <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-reset">
             <path d="M3 2v6h6"></path><path d="M21 12A9 9 0 0 0 6 5.3L3 8"></path><path d="M21 22v-6h-6"></path><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"></path>
         </symbol>
+
+        <!-- ★★★ 修正箇所 (依頼2) ★★★ -->
+        <!-- ★ 追加: 拡大・縮小アイコン -->
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-maximize">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-minimize">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+        </symbol>
+        <!-- ★★★ 修正箇所ここまで ★★★ -->
+
     </svg>
 
     <aside id="sidebar" class="bg-gray-800 h-screen w-64 p-4 flex flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
@@ -413,14 +424,37 @@
                         </div>
                 </div>
 
+                <!-- ★★★ 修正箇所 (依頼3) ★★★ -->
+                <!-- ★ 追加: 翻訳候補表示コンテナ -->
+                <div id="prompt-suggestions-container" class="hidden mb-4 p-3 bg-gray-700/50 rounded-lg max-h-48 overflow-y-auto">
+                    <p class="text-sm text-gray-300 mb-2">Multiple prompt suggestions found. Select desired prompts:</p>
+                    <div id="prompt-suggestions-list" class="space-y-2">
+                        <!-- 翻訳候補がJSによってここに追加されます -->
+                    </div>
+                    <button type="button" id="apply-suggestions-button" class="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition">
+                        Set Selected Prompts
+                    </button>
+                </div>
+                <!-- ★★★ 修正箇所ここまで ★★★ -->
+
+
                 <div id="edit-mode-indicator" class="hidden text-center text-indigo-300 text-sm font-medium p-2 bg-indigo-900/50 rounded-lg mt-3">
                     🎨 Editing Mode - Subsequent generations will edit the current image. (Change model to Imagen 3.0 to exit)
                 </div>
 
                 <div class="relative mt-4">
-                    <textarea id="prompt-input" rows="2" class="block w-full p-4 pr-48 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Enter your prompt... (Non-English will be translated)"></textarea>
+                    <!-- ★ 修正: pr-56 (ボタン5個分) -->
+                    <textarea id="prompt-input" rows="2" class="block w-full p-4 pr-56 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Enter your prompt... (Non-English will be translated)"></textarea>
                     
-                    <div class="absolute bottom-3 right-32 flex space-x-2">
+                    <!-- ★ 修正: right-32 -> right-44 -->
+                    <div class="absolute bottom-3 right-44 flex space-x-2">
+                         <!-- ★★★ 修正箇所 (依頼2) ★★★ -->
+                         <!-- ★ 追加: 拡大・縮小ボタン -->
+                         <button id="prompt-toggle-size-button" type="button" class="p-2 bg-gray-600 text-gray-400 rounded-lg hover:bg-gray-500 hover:text-gray-200 transition" data-tooltip="Toggle Size">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-maximize"></use></svg>
+                        </button>
+                         <!-- ★★★ 修正箇所ここまで ★★★ -->
+                         
                          <button id="prompt-copy-button" type="button" class="p-2 bg-gray-600 text-gray-400 rounded-lg hover:bg-gray-500 hover:text-gray-200 transition" data-tooltip="Copy Prompt">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-copy"></use></svg>
                         </button>
@@ -594,6 +628,16 @@
         // ★ 追加: プロンプトボタン
         const promptCopyButton = document.getElementById('prompt-copy-button');
         const promptClearButton = document.getElementById('prompt-clear-button');
+        // ★★★ 修正箇所 (依頼2) ★★★
+        const promptToggleSizeButton = document.getElementById('prompt-toggle-size-button'); // ★ 追加
+        // ★★★ 修正箇所ここまで ★★★
+
+        // ★★★ 修正箇所 (依頼3) ★★★
+        const promptSuggestionsContainer = document.getElementById('prompt-suggestions-container'); // ★ 追加
+        const promptSuggestionsList = document.getElementById('prompt-suggestions-list'); // ★ 追加
+        const applySuggestionsButton = document.getElementById('apply-suggestions-button'); // ★ 追加
+        // ★★★ 修正箇所ここまで ★★★
+
 
         const loadingAnimation = document.getElementById('loading-animation');
         const imageDisplay = document.getElementById('image-display');
@@ -1095,11 +1139,20 @@
             authForm.addEventListener('submit', handleAuthSubmit);
 
             generationForm.addEventListener('submit', handleGenerationSubmit); // ★ 変更あり
-            translateButton.addEventListener('click', handleTranslate);
+            translateButton.addEventListener('click', handleTranslate); // ★ 変更あり
             
             // ★ 追加: プロンプトボタンリスナー
             promptCopyButton.addEventListener('click', handlePromptCopy);
             promptClearButton.addEventListener('click', handlePromptClear);
+            
+            // ★★★ 修正箇所 (依頼2) ★★★
+            promptToggleSizeButton.addEventListener('click', handleTogglePromptSize); // ★ 追加
+            // ★★★ 修正箇所ここまで ★★★
+
+            // ★★★ 修正箇所 (依頼3) ★★★
+            applySuggestionsButton.addEventListener('click', handleApplySuggestions); // ★ 追加
+            // ★★★ 修正箇所ここまで ★★★
+
             
             // ★ 追加 (モデル選択アコーディオン)
             modelsToggleBtn.addEventListener('click', () => toggleModelsAccordion());
@@ -1523,14 +1576,23 @@
         }
         // ★★★ 修正箇所ここまで ★★★
 
+        // ★★★ 修正箇所 (依頼3) ★★★
+        /**
+         * ★ 変更: 翻訳処理 (複数候補の解析)
+         */
         async function handleTranslate() {
-            // ... (変更なし)
             const prompt = promptInput.value;
             if (!prompt) {
                 showToast("Please enter text to translate", "warning");
                 return;
             }
+
+            // ★ 翻訳実行時に、既存の候補をクリア
+            promptSuggestionsContainer.classList.add('hidden');
+            promptSuggestionsList.innerHTML = '';
+            
             setLoading(translateButton, true);
+
             try {
                 // ★ 変更: 翻訳キャンセル用の AbortController
                 const controller = new AbortController();
@@ -1550,8 +1612,56 @@
 
                 const data = await response.json();
                 if (response.ok) {
-                    promptInput.value = data.translatedPrompt;
-                    showToast("Translation successful", "success");
+                    const translatedText = data.translatedPrompt;
+                    
+                    // ★ 複数候補の解析
+                    // 1. 2回以上の改行で分割
+                    let candidates = translatedText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+                    
+                    // 2. もし分割数が1なら、[パターン] や [1] のような形式で分割を試みる
+                    if (candidates.length <= 1) {
+                         // [A-Za-z0-9] や [0-9] で始まる行で分割 (ただし、単語の[]は除外する)
+                         // 簡易的に、行頭が [ で始まるかで分割
+                        const bracketCandidates = translatedText.split(/\n\s*(?=\[)/).filter(p => p.trim().length > 0);
+                        if (bracketCandidates.length > 1) {
+                            candidates = bracketCandidates;
+                        }
+                    }
+
+                    // 3. 分割した候補をサニタイズ (前置きの削除)
+                    candidates = candidates.map(c => 
+                        c.trim()
+                         .replace(/^\[.*?\]\s*/, '') // 行頭の [パターン1] などを削除
+                         .replace(/^[0-9]\.\s*/, '')   // 行頭の 1. などを削除
+                         .trim()
+                    ).filter(c => c.length > 0); // 空の候補を削除
+
+                    // 4. UIに反映
+                    if (candidates.length > 1) {
+                        // 複数候補あり
+                        promptInput.value = ""; // メイン入力欄はクリア
+                        promptSuggestionsList.innerHTML = ''; // リストをクリア
+                        
+                        candidates.forEach((candidate, index) => {
+                            const suggestionId = `suggestion-${index}`;
+                            const div = document.createElement('div');
+                            div.className = "flex items-center bg-gray-800 p-2 rounded";
+                            div.innerHTML = `
+                                <input id="${suggestionId}" type="checkbox" value="${escapeHTML(candidate)}" class="suggestion-checkbox w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500">
+                                <label for="${suggestionId}" class="ml-2 text-sm text-gray-200 cursor-pointer">${escapeHTML(candidate)}</label>
+                            `;
+                            promptSuggestionsList.appendChild(div);
+                        });
+                        
+                        promptSuggestionsContainer.classList.remove('hidden');
+                        showToast("Multiple suggestions found", "info");
+
+                    } else {
+                        // 候補が1つ、または解析失敗
+                        promptInput.value = translatedText; // そのままセット
+                        showToast("Translation successful", "success");
+                    }
+
                 } else {
                     throw new Error(data.error || "Translation failed");
                 }
@@ -1564,8 +1674,47 @@
                 }
             } finally {
                 setLoading(translateButton, false);
+                // フッターの高さが変わる可能性があるのでパディングを再調整
+                setTimeout(adjustMainContentPadding, 100);
             }
         }
+        
+        /**
+         * ★ 追加 (依頼3): 選択された翻訳候補を入力欄にセットする
+         */
+        function handleApplySuggestions() {
+            const selectedCandidates = Array.from(document.querySelectorAll('.suggestion-checkbox:checked'));
+            const combinedPrompt = selectedCandidates.map(cb => cb.value).join(', '); // カンマ区切りで連結
+
+            if (combinedPrompt.length === 0) {
+                showToast("Please select at least one suggestion", "warning");
+                return;
+            }
+
+            promptInput.value = combinedPrompt;
+            promptSuggestionsContainer.classList.add('hidden'); // コンテナを隠す
+            promptSuggestionsList.innerHTML = ''; // リストをクリア
+            
+            // フッターの高さが変わるのでパディングを再調整
+            setTimeout(adjustMainContentPadding, 100);
+        }
+
+        /**
+         * ★ 追加 (依頼3): HTMLエスケープ用
+         */
+        function escapeHTML(str) {
+            return str.replace(/[&<>"']/g, function(match) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[match];
+            });
+        }
+        // ★★★ 修正箇所ここまで ★★★
+
 
         // ★ 変更: キャンセル機能 + エラー時のGAS送信
         // ★ 依頼③: スタイルのみ編集のロジックを反映
@@ -1584,6 +1733,12 @@
                 }
                 // リセットは finally で
                 return;
+            }
+            
+            // ★ 翻訳候補エリアが開いていたら、それを閉じる
+            if (!promptSuggestionsContainer.classList.contains('hidden')) {
+                 promptSuggestionsContainer.classList.add('hidden');
+                 setTimeout(adjustMainContentPadding, 100);
             }
 
             const prompt = promptInput.value;
@@ -1726,10 +1881,12 @@
 
             } // end for loop
             
-            // ★ プロンプトクリア (即時) (編集モード時はクリアしない)
-            if (!isEditingMode) {
-                promptInput.value = "";
-            }
+            // ★★★ 修正箇所 (依頼1) ★★★
+            // ★ 削除: プロンプトクリア (即時) (編集モード時はクリアしない)
+            // if (!isEditingMode) {
+            //     promptInput.value = "";
+            // }
+            // ★★★ 修正箇所ここまで ★★★
 
         } // end handleGenerationSubmit
         // ★★★ 修正箇所ここまで ★★★
@@ -1821,6 +1978,26 @@
             promptInput.value = "";
             showToast("Input cleared", "info");
         }
+
+        // ★★★ 修正箇所 (依頼2) ★★★
+        /**
+         * ★ 追加: プロンプト入力欄のサイズをトグルする
+         */
+        function handleTogglePromptSize() {
+            const icon = promptToggleSizeButton.querySelector('svg use');
+            if (promptInput.rows === 2) {
+                promptInput.rows = 10;
+                if (icon) icon.setAttribute('href', '#icon-minimize');
+                promptToggleSizeButton.dataset.tooltip = "Minimize Size";
+            } else {
+                promptInput.rows = 2;
+                if (icon) icon.setAttribute('href', '#icon-maximize');
+                promptToggleSizeButton.dataset.tooltip = "Maximize Size";
+            }
+            // フッターの高さが変わるのでパディングを再調整
+            setTimeout(adjustMainContentPadding, 100);
+        }
+        // ★★★ 修正箇所ここまで ★★★
 
 
         // --- MODAL & TOAST functions ---
