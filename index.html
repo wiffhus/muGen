@@ -6,130 +6,182 @@
     <title>muGen - AI Image Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* (省略: v12と同じスタイル) */
+        /* Inter Font (Mac-like) */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        html, body { font-family: 'Inter', sans-serif; overscroll-behavior: none; }
+        
+        html, body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
+        }
+
+        /* Custom scrollbar for sidebar */
         .sidebar-scroll::-webkit-scrollbar { width: 4px; }
         .sidebar-scroll::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 4px; }
         .sidebar-scroll::-webkit-scrollbar-track { background-color: #1f2937; }
-        .noise-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; background: #111827; z-index: 10; display: none; opacity: 0; transition: opacity 0.3s ease-in-out; }
+
+        /* Dynamic Noise Animation */
+        .noise-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            overflow: hidden; background: #111827; z-index: 10;
+            display: none; opacity: 0; transition: opacity 0.3s ease-in-out;
+        }
         .noise-container.active { display: block; opacity: 1; }
-        .noise-container::before { content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E"); background-size: 128px 128px; opacity: 0.15; animation: noise-animation 0.2s linear infinite; }
-        @keyframes noise-animation { 0% { transform: translate(0, 0); } 10% { transform: translate(-5%, -5%); } 20% { transform: translate(-10%, 5%); } 30% { transform: translate(5%, -10%); } 40% { transform: translate(-5%, 15%); } 50% { transform: translate(-10%, -5%); } 60% { transform: translate(15%, 0); } 70% { transform: translate(0, 10%); } 80% { transform: translate(-15%, 0); } 90% { transform: translate(10%, 5%); } 100% { transform: translate(5%, 0); } }
-        .style-checkbox:checked + label { background-color: #4f46e5; border-color: #4f46e5; color: #ffffff; }
-        .model-checkbox:checked + label { background-color: #3730a3; border-color: #4f46e5; color: #ffffff; font-weight: 500; }
-        .modal { display: none; position: fixed; z-index: 50; inset: 0; overflow-y: auto; background-color: rgba(0, 0, 0, 0.7); align-items: center; justify-content: center; }
+        .noise-container::before {
+            content: ""; position: absolute; top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            background-size: 128px 128px; opacity: 0.15;
+            animation: noise-animation 0.2s linear infinite;
+        }
+        @keyframes noise-animation {
+            0% { transform: translate(0, 0); } 10% { transform: translate(-5%, -5%); }
+            20% { transform: translate(-10%, 5%); } 30% { transform: translate(5%, -10%); }
+            40% { transform: translate(-5%, 15%); } 50% { transform: translate(-10%, -5%); }
+            60% { transform: translate(15%, 0); } 70% { transform: translate(0, 10%); }
+            80% { transform: translate(-15%, 0); } 90% { transform: translate(10%, 5%); }
+            100% { transform: translate(5%, 0); }
+        }
+
+        /* Custom Checkbox */
+        .style-checkbox:checked + label {
+            background-color: #4f46e5; border-color: #4f46e5; color: #ffffff;
+        }
+        .model-checkbox:checked + label {
+            background-color: #3730a3; border-color: #4f46e5; color: #ffffff; font-weight: 500;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none; position: fixed; z-index: 50; inset: 0;
+            overflow-y: auto; background-color: rgba(0, 0, 0, 0.7);
+            align-items: center; justify-content: center;
+        }
         .modal.flex { display: flex; }
         #auth-modal { z-index: 60; }
         #delete-confirm-modal { z-index: 60; }
+
+        /* Modal Image Zoom */
         #modal-image-wrapper { transition: all 0.3s ease; }
-        #modal-image { transition: transform 0.2s ease-out; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; transform-origin: top left; }
-        [data-tooltip] { position: relative; }
-        [data-tooltip]:hover::after { content: attr(data-tooltip); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background-color: #1f2937; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap; z-index: 60; opacity: 1; transition: opacity 0.2s; }
-        .rotate-180 { transform: rotate(180deg); }
-        .drag-over { border-style: dashed; border-color: #4f46e5; background-color: #1f2937; }
-        .history-info-container { width: 100%; overflow: hidden; white-space: nowrap; position: absolute; bottom: 0; left: 0; background: rgba(0, 0, 0, 0.7); opacity: 0; transition: opacity 0.3s; pointer-events: none; }
-        .group:hover .history-info-container { opacity: 1; }
-        .history-info-text-wrapper { display: inline-block; white-space: nowrap; animation: marquee 25s linear infinite; }
-        .history-info-text { display: inline-block; padding: 4px 12px; color: white; font-size: 10px; }
-        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        #toast { max-width: 400px; word-break: break-word; }
-        .image-card { position: relative; background-color: #374151; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem; text-align: center; overflow: hidden; }
-        .image-blurred { filter: blur(16px); transition: filter 0.2s ease-in-out; }
-        
-        /* ★ v13: トグルスイッチ (Tailwind) */
-        .toggle-switch-bg {
-            transition: background-color 0.2s ease-in-out;
-        }
-        .toggle-switch-dot {
-            transition: transform 0.2s ease-in-out;
-        }
-        input:checked + .toggle-switch-bg {
-            background-color: #4f46e5; /* Indigo 600 */
-        }
-        input:checked + .toggle-switch-bg .toggle-switch-dot {
-            transform: translateX(100%);
+        #modal-image {
+            transition: transform 0.2s ease-out;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            transform-origin: top left;
         }
 
+        /* Tooltip */
+        [data-tooltip] { position: relative; }
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip); position: absolute; bottom: 110%;
+            left: 50%; transform: translateX(-50%); background-color: #1f2937;
+            color: #ffffff; padding: 4px 8px; border-radius: 4px;
+            font-size: 12px; white-space: nowrap; z-index: 60;
+            opacity: 1; transition: opacity 0.2s;
+        }
+
+        /* Chevron rotation */
+        .rotate-180 { transform: rotate(180deg); }
+
+        /* Drag over effect */
+        .drag-over {
+            border-style: dashed; border-color: #4f46e5; background-color: #1f2937;
+        }
+
+        /* History Marquee */
+        .history-info-container {
+            width: 100%; overflow: hidden; white-space: nowrap;
+            position: absolute; bottom: 0; left: 0;
+            background: rgba(0, 0, 0, 0.7); opacity: 0;
+            transition: opacity 0.3s; pointer-events: none;
+        }
+        .group:hover .history-info-container { opacity: 1; }
+        .history-info-text-wrapper {
+            display: inline-block; white-space: nowrap;
+            animation: marquee 25s linear infinite;
+        }
+        .history-info-text {
+            display: inline-block; padding: 4px 12px;
+            color: white; font-size: 10px;
+        }
+        @keyframes marquee {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-50%); } 
+        }
+
+        /* Toast */
+        #toast { max-width: 400px; word-break: break-word; }
+        
+        /* Image Card */
+        .image-card {
+            position: relative; background-color: #374151; /* gray-700 */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+            display: flex; flex-direction: column; 
+            align-items: center; justify-content: center;
+            padding: 0.5rem; /* p-2 */
+            text-align: center; overflow: hidden;
+        }
+
+        /* ★★★ 修正箇所 (v13) ★★★ */
+        /* ぼかし用フィルター */
+        .image-blurred {
+            filter: blur(16px);
+            transition: filter 0.2s ease-in-out;
+        }
+        /* BGトグルスイッチ */
+        .toggle-bg:checked + .toggle-label {
+            background-color: #16a34a; /* green-600 */
+        }
+        .toggle-bg:checked + .toggle-label > span { /* after擬似要素の代わり */
+            transform: translateX(100%);
+            border-color: #ffffff;
+        }
+        .toggle-label {
+            transition: background-color 0.2s ease-in-out;
+        }
+        .toggle-label > span { /* after擬似要素の代わり */
+            transition: transform 0.2s ease-in-out;
+        }
+        /* ★★★ 修正箇所ここまで ★★★ */
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen w-screen flex">
 
     <!-- (省略: v12と同じSVGアイコン) -->
     <svg width="0" height="0" class="hidden">
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-menu">
-            <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-translate"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-stop"><circle cx="12" cy="12" r="10"></circle><rect x="9" y="9" width="6" height="6"></rect></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-image"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-edit"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-copy"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-refresh"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-loader"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" id="icon-chevron-down"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-upload"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-x-circle"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-lock"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-in"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-out"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-reset"><path d="M3 2v6h6"></path><path d="M21 12A9 9 0 0 0 6 5.3L3 8"></path><path d="M21 22v-6h-6"></path><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"></path></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-maximize"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-minimize"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-eye"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-eye-off"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-trash"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></symbol>
+        <!-- ★★★ 追加 (v13) ★★★ -->
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-cloud-lightning">
+            <path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"></path><polyline points="13 11 9 17 15 17 11 23"></polyline>
         </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-x">
-            <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-clock">
+            <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
         </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-translate">
-            <polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-send">
-            <line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-stop">
-            <circle cx="12" cy="12" r="10"></circle><rect x="9" y="9" width="6" height="6"></rect>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-image">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-edit">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-copy">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-refresh">
-            <polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-loader">
-            <line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" id="icon-chevron-down">
-             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-upload">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-x-circle">
-            <circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-lock">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-in">
-            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-out">
-            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-zoom-reset">
-            <path d="M3 2v6h6"></path><path d="M21 12A9 9 0 0 0 6 5.3L3 8"></path><path d="M21 22v-6h-6"></path><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"></path>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-maximize">
-            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-minimize">
-            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-eye">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-eye-off">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-trash">
-            <polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </symbol>
-        <!-- ★ v13: クラウド(BG)アイコン -->
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-cloud">
-            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
-        </symbol>
+        <!-- ★★★ 追加ここまで ★★★ -->
     </svg>
 
-    <!-- (省略: v12と同じサイドバー) -->
+    <!-- (省略: v12と同じサイドバーHTML) -->
     <aside id="sidebar" class="bg-gray-800 h-screen w-64 p-4 flex flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-xl font-bold text-white">muGen History</h1>
@@ -165,8 +217,9 @@
         </div>
     </aside>
 
-    <!-- (省略: v12と同じメインコンテンツヘッダー) -->
     <main id="main-content" class="flex-1 flex flex-col transition-all duration-300 ease-in-out md:ml-64 min-h-screen">
+        
+        <!-- (省略: v12と同じヘッダーHTML) -->
         <header class="flex-shrink-0 bg-gray-900/70 backdrop-blur-sm h-16 flex items-center px-6 shadow-md z-20">
             <button id="sidebar-toggle-button" class="text-gray-400 hover:text-white mr-4" data-tooltip="Toggle History">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-menu"></use></svg>
@@ -182,7 +235,7 @@
             </div>
         </header>
 
-        <!-- (省略: v12と同じ画像コンテナ) -->
+        <!-- (省略: v12と同じ画像コンテナHTML) -->
         <div id="image-container" class="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-hidden">
             <div id="image-display" class="w-full h-full flex items-center justify-center bg-gray-800 rounded-lg shadow-inner relative border-2 border-transparent transition-all overflow-auto p-4"> 
                 <div id="image-grid-container" class="w-full h-full grid gap-4">
@@ -212,9 +265,9 @@
         <footer id="prompt-footer" class="p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm z-10 fixed bottom-0 w-full md:left-64 transition-all duration-300 ease-in-out">
             <form id="generation-form" class="max-w-4xl mx-auto">
                 
-                <!-- ★ v13: オプションツールバー変更 -->
                 <div class="flex flex-wrap gap-4 mb-4" id="options-toolbar">
                     
+                    <!-- (省略: v12と同じモデル選択) -->
                     <div id="model-select-group" class="w-full md:w-auto relative">
                         <button type="button" id="models-toggle" class="flex justify-between items-center w-full p-2.5 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-600 transition">
                             <label class="block text-sm font-medium text-white cursor-pointer">Models (Multiple)</label>
@@ -223,10 +276,11 @@
                             </svg>
                         </button>
                         <div id="models-container" class="hidden max-h-48 overflow-y-auto flex flex-col gap-1 p-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700 rounded-lg mt-1">
-                            <!-- (Models loaded by JS) -->
+                            <!-- JSで挿入 -->
                         </div>
                     </div>
-
+                    
+                    <!-- (省略: v12と同じアスペクト比) -->
                     <div id="aspect-ratio-group">
                         <label for="aspect-ratio-select" class="block text-sm font-medium text-gray-300 mb-1">Aspect Ratio</label>
                         <select id="aspect-ratio-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
@@ -237,8 +291,8 @@
                             <option value="3:2">3:2 Photo</option>
                         </select>
                     </div>
-
-                    <!-- ★ v13: Auto Retry (フォアグラウンドモード用) -->
+                    
+                    <!-- ★★★ 変更 (v13): ラベル変更 ★★★ -->
                     <div id="auto-retry-group">
                         <label for="auto-retry-select" class="block text-sm font-medium text-gray-300 mb-1">Auto Retry (FG)</label>
                         <select id="auto-retry-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
@@ -249,23 +303,9 @@
                             <option value="-1">Custom...</option>
                         </select>
                     </div>
-
-                    <!-- ★ v13: バックグラウンド生成トグル -->
-                    <div id="background-mode-group" class="flex items-end">
-                        <div class="relative flex items-center gap-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5 h-full">
-                            <label for="background-mode-toggle" class="cursor-pointer font-medium" data-tooltip="Enable background processing (page can be closed)">
-                                Background Mode
-                            </label>
-                            <input id="background-mode-toggle" type="checkbox" class="hidden">
-                            <label for="background-mode-toggle" class="toggle-switch-bg relative inline-flex items-center h-6 w-11 cursor-pointer rounded-full bg-gray-600">
-                                <span class="toggle-switch-dot absolute left-1 inline-block h-4 w-4 transform rounded-full bg-white"></span>
-                            </label>
-                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-cloud"></use></svg>
-                        </div>
-                    </div>
                     
                     <div id="edit-with-flash-group" class="flex items-end gap-2">
-                        <!-- (v12と同じ: Editボタン, Private Mode) -->
+                        <!-- (省略: v12と同じ Editボタン) -->
                         <button type="button" id="edit-with-flash-button" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition flex items-center gap-2" data-tooltip="Switch to Edit Mode with Gemini 2.5 Flash">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
                             Edit with 2.5 flash
@@ -275,6 +315,7 @@
                             Edit with 2.0 flash
                         </button>
                         
+                        <!-- (省略: v12と同じ Private Mode) -->
                         <div id="private-mode-group" class="flex items-end">
                             <div class="relative flex items-center gap-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5 h-full">
                                 <input id="private-mode-toggle" type="checkbox" class="w-5 h-5 text-indigo-600 bg-gray-800 border-gray-600 rounded focus:ring-indigo-500">
@@ -284,10 +325,27 @@
                                 <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-eye-off"></use></svg>
                             </div>
                         </div>
+                        
+                        <!-- ★★★ 追加 (v13): BGトグルスイッチ ★★★ -->
+                        <div id="bg-mode-group" class="flex items-end">
+                            <div class="relative flex items-center gap-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5 h-full">
+                                <input id="bg-mode-toggle" type="checkbox" class="hidden toggle-bg">
+                                <label for="bg-mode-toggle" class="relative inline-flex items-center cursor-pointer">
+                                    <span class="w-10 h-5 bg-gray-600 rounded-full shadow-inner toggle-label">
+                                        <span class="absolute left-0 w-5 h-5 bg-white border border-gray-300 rounded-full shadow-md transform" style="top: 0; left: 0;"></span>
+                                    </span>
+                                </label>
+                                <label for="bg-mode-toggle" class="ml-2 cursor-pointer font-medium" data-tooltip="Background Mode (Page close OK)">
+                                    BG Mode
+                                </label>
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-cloud-lightning"></use></svg>
+                            </div>
+                        </div>
+                        <!-- ★★★ 追加ここまで ★★★ -->
                     </div>
                 </div>
 
-                <!-- (省略: v12と同じ Styles / Suggestions) -->
+                <!-- (省略: v12と同じ Styles) -->
                 <div class="mb-4">
                     <button type="button" id="styles-toggle" class="flex justify-between items-center w-full p-2 rounded-lg hover:bg-gray-700 transition">
                         <label class="block text-sm font-medium text-gray-300 cursor-pointer">Styles (Optional, multiple)</label>
@@ -299,27 +357,27 @@
                         <!-- Selected styles will be shown here -->
                     </div>
                     <div id="styles-container" class="hidden max-h-48 overflow-y-auto flex flex-wrap gap-2 p-3 bg-gray-700/50 rounded-lg mt-2">
-                        <!-- (Styles loaded by JS) -->
+                        <!-- JSで挿入 -->
                     </div>
                 </div>
 
+                <!-- (省略: v12と同じ Prompt Suggestions) -->
                 <div id="prompt-suggestions-container" class="hidden mb-4 p-3 bg-gray-700/50 rounded-lg max-h-48 overflow-y-auto">
                     <p class="text-sm text-gray-300 mb-2">Multiple prompt suggestions found. Select desired prompts:</p>
                     <div id="prompt-suggestions-list" class="space-y-2">
-                        <!-- (Suggestions loaded by JS) -->
+                        <!-- 翻訳候補がJSによってここに追加されます -->
                     </div>
                     <button type="button" id="apply-suggestions-button" class="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition">
                         Set Selected Prompts
                     </button>
                 </div>
 
-
                 <!-- (省略: v12と同じ Edit Mode Indicator) -->
                 <div id="edit-mode-indicator" class="hidden text-center text-indigo-300 text-sm font-medium p-2 bg-indigo-900/50 rounded-lg mt-3">
                     🎨 Editing Mode - Subsequent generations will edit the current image. (Change model to Imagen 3.0 to exit)
                 </div>
 
-                <!-- (省略: v12と同じ プロンプト入力欄) -->
+                <!-- (省略: v12と同じ Prompt Input) -->
                 <div class="relative mt-4">
                     <textarea id="prompt-input" rows="2" class="block w-full p-4 pr-56 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Enter your prompt... (Non-English will be translated)"></textarea>
                     
@@ -348,18 +406,15 @@
         </footer>
     </main>
 
-    <!-- (省略: v12と同じ 画像モーダル) -->
+    <!-- (省略: v12と同じ Image Modal) -->
     <div id="image-modal" class="modal">
         <div class="bg-gray-800 rounded-lg shadow-xl w-11/12 max-w-6xl max-h-[95vh] flex flex-col p-4">
-            
             <div id="modal-image-wrapper" class="flex-1 flex items-center justify-center overflow-auto bg-gray-900/50 rounded-lg min-h-[50vh] mb-4">
                 <img id="modal-image" src="" class="max-w-full max-h-full object-contain">
             </div>
-
             <div class="bg-gray-900 rounded-b-lg p-4">
                 <p class="text-sm text-gray-300 mb-2">Prompt:</p>
                 <p id="modal-prompt" class="text-white bg-gray-700 p-3 rounded-lg max-h-24 overflow-y-auto"></p>
-                
                 <div class="flex flex-wrap gap-4 mt-4">
                     <button id="modal-copy" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition" data-tooltip="Copy Prompt">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-copy"></use></svg>
@@ -373,7 +428,6 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
                         <span>Edit</span>
                     </button>
-                    
                     <div class="flex items-center gap-2 ml-auto">
                         <button id="modal-zoom-out" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white p-2.5 rounded-lg transition" data-tooltip="Zoom Out">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-zoom-out"></use></svg>
@@ -385,7 +439,6 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-zoom-reset"></use></svg>
                         </button>
                     </div>
-
                 </div>
             </div>
             <button id="modal-close" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-gray-800/50 rounded-full p-1">
@@ -394,7 +447,7 @@
         </div>
     </div>
 
-    <!-- (省略: v12と同じ Toast / Auth Modal / Delete Modal) -->
+    <!-- (省略: v12と同じ Toast) -->
     <div id="toast" class="fixed top-20 right-6 text-white py-3 px-4 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50">
         <div class="flex items-start justify-between">
             <p id="toast-message" class="flex-1 pr-4">Message</p>
@@ -409,7 +462,9 @@
         </div>
     </div>
     
-    <div id="auth-modal" class="modal flex"> <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
+    <!-- (省略: v12と同じ Auth Modal) -->
+    <div id="auth-modal" class="modal flex">
+        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
             <div class="flex items-center justify-center mb-4">
                 <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-lock"></use></svg>
                 <h2 class="text-xl font-bold text-white ml-2">Authentication Required</h2>
@@ -425,6 +480,7 @@
         </div>
     </div>
 
+    <!-- (省略: v12と同じ Delete Confirm Modal) -->
     <div id="delete-confirm-modal" class="modal"> 
         <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
             <div class="flex items-center justify-center mb-4">
@@ -450,7 +506,6 @@
 
     <script>
         // --- CONSTANTS & STATE (v13) ---
-        // (v12と同じ)
         const STYLES = [
             "Photorealistic", "Cinematic", "35mm film", "Black and white", "Impressionistic",
             "Surrealism", "Watercolour", "Ukiyo-e", "Cyberpunk", "Steampunk",
@@ -458,17 +513,19 @@
         ];
         const CUSTOM_STYLES_KEY = 'muGenCustomStyles';
         const MODELS = {
+            // Imagen
             "imagen-4.0-ultra-generate-preview-06-06": { name: "Imagen 4.0 Ultra", type: "imagen" },
             "imagen-4.0-generate-preview-06-06": { name: "Imagen 4.0", type: "imagen" },
             "imagen-4.0-fast-generate-001": { name: "Imagen 4.0 Fast", type: "imagen" },
             "imagen-3.0-generate": { name: "Imagen 3.0", type: "imagen" },
+            // Gemini (Edit)
             "gemini-2.5-flash-image-preview": { name: "Gemini 2.5 Flash Image", type: "gemini-edit" },
             "gemini-2.0-flash-preview-image-generation": { name: "Gemini 2.0 Flash Image", type: "gemini-edit" }
         };
-        const PRICE_IMAGEN_USD = 0.02; 
+        const PRICE_IMAGEN_USD = 0.02;
         const PRICE_GEMINI_FLASH_IMAGE_USD = 0.002;
         const PRICE_GEMINI_FLASH_IMAGE_2_0_USD = 0.002;
-        const USD_JPY_RATE = 150; 
+        const USD_JPY_RATE = 150; // 仮の為替レート
 
         let db;
         let apiKeyCounter = 0; 
@@ -476,25 +533,30 @@
         let isEditingMode = false;
         let lastEnterPress = 0; 
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        // ★★★ 変更 (v13) ★★★
+        // FG (フォアグラウンド) 用の変数
+        let generationInProgress_FG = false; 
+        let runningGenerations_FG = new Set(); 
+        let currentFetchController_FG = null;
         
-        let generationInProgress = false; 
-        let runningGenerations = new Set(); 
-        let currentFetchController = null;
-        let toastTimeoutId = null;
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let touchMoveX = 0;
-        let modalZoomLevel = 1.0;
-        const MAX_ZOOM = 10;
-        const MIN_ZOOM = 0.5;
+        // BG (バックグラウンド) 用のポーリング変数
+        let isPolling_BG = false;
+        let pollingIntervalId_BG = null;
+        // ★ 変更: 複数のBGジョブを同時にポーリングできるようにSetで管理
+        let pollingJobs_BG = new Set(); // { jobId, cardId, modelName } を格納
         
-        // ★ v13: ポーリング関連
         const POLLING_INTERVAL = 5000; // 5秒
-        let activePollingJobs = new Map(); // key: cardId, value: { jobId, intervalId }
+        // ★★★ 変更ここまで ★★★
+        
+        let toastTimeoutId = null;
+        let touchStartX = 0, touchStartY = 0, touchMoveX = 0;
+        let modalZoomLevel = 1.0;
+        const MAX_ZOOM = 10, MIN_ZOOM = 0.5;
 
 
         // --- DOM ELEMENTS (v13) ---
-        // (v12と同じ)
+        // (省略: v12と同じ要素)
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('main-content');
         const sidebarToggleButton = document.getElementById('sidebar-toggle-button');
@@ -507,10 +569,10 @@
         const generateButton = document.getElementById('generate-button');
         const promptCopyButton = document.getElementById('prompt-copy-button');
         const promptClearButton = document.getElementById('prompt-clear-button');
-        const promptToggleSizeButton = document.getElementById('prompt-toggle-size-button'); 
-        const promptSuggestionsContainer = document.getElementById('prompt-suggestions-container'); 
-        const promptSuggestionsList = document.getElementById('prompt-suggestions-list'); 
-        const applySuggestionsButton = document.getElementById('apply-suggestions-button'); 
+        const promptToggleSizeButton = document.getElementById('prompt-toggle-size-button');
+        const promptSuggestionsContainer = document.getElementById('prompt-suggestions-container');
+        const promptSuggestionsList = document.getElementById('prompt-suggestions-list');
+        const applySuggestionsButton = document.getElementById('apply-suggestions-button');
         const loadingAnimation = document.getElementById('loading-animation');
         const imageDisplay = document.getElementById('image-display');
         const imageGridContainer = document.getElementById('image-grid-container');
@@ -527,7 +589,7 @@
         const modalCopy = document.getElementById('modal-copy');
         const modalRegenerate = document.getElementById('modal-regenerate');
         const modalClose = document.getElementById('modal-close');
-        const modalEdit = document.getElementById('modal-edit'); 
+        const modalEdit = document.getElementById('modal-edit');
         const modalImageWrapper = document.getElementById('modal-image-wrapper');
         const modalZoomIn = document.getElementById('modal-zoom-in');
         const modalZoomOut = document.getElementById('modal-zoom-out');
@@ -537,7 +599,7 @@
         const aspectRatioGroup = document.getElementById('aspect-ratio-group');
         const autoRetryGroup = document.getElementById('auto-retry-group');
         const editWithFlashButton = document.getElementById('edit-with-flash-button');
-        const editWithFlash20Button = document.getElementById('edit-with-flash-2-0-button'); 
+        const editWithFlash20Button = document.getElementById('edit-with-flash-2-0-button');
         const stylesToggleBtn = document.getElementById('styles-toggle');
         const stylesContainer = document.getElementById('styles-container');
         const stylesChevron = document.getElementById('styles-chevron');
@@ -564,49 +626,49 @@
         const deleteConfirmError = document.getElementById('delete-confirm-error');
         const confirmDeleteButton = document.getElementById('confirm-delete-button');
         const cancelDeleteButton = document.getElementById('cancel-delete-button');
+        
+        // ★★★ 追加 (v13) ★★★
+        const bgModeToggle = document.getElementById('bg-mode-toggle');
+        // ★★★ 追加ここまで ★★★
 
-        // ★ v13: 新しいDOM
-        const backgroundModeToggle = document.getElementById('background-mode-toggle');
-        const backgroundModeGroup = document.getElementById('background-mode-group');
 
-
-        // --- INITIALIZATION (v13) ---
+        // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
             checkAuth(); 
             initDB();
             initSidebar();
             initStyles();
-            initModels(); 
-            initListeners(); // ★ v13: 変更あり
+            initModels();
+            initListeners(); // ★ 変更あり
             loadHistory();
-            adjustMainContentPadding(); 
-            updatePlaceholderVisibility(); 
-            updateSelectedStylesPreview(false); 
+            adjustMainContentPadding();
+            updatePlaceholderVisibility();
+            updateSelectedStylesPreview(false);
+            
+            // ★ v13: 初期UI状態を設定
+            handleBGModeToggle(); 
         });
 
-        // --- AUTHENTICATION (v12と同じ) ---
+        // --- ★ v13: AUTHENTICATION ---
+        // (省略: v12と同じ checkAuth, handleAuthSubmit 関数)
         function checkAuth() {
             if (sessionStorage.getItem('muGenAuthenticated') === 'true') {
-                authModal.classList.remove('flex'); 
+                authModal.classList.remove('flex');
             } else {
-                authModal.classList.add('flex'); 
+                authModal.classList.add('flex');
             }
         }
-        
         async function handleAuthSubmit(event) {
             event.preventDefault();
             const password = authPassword.value;
             if (!password) return;
-            setLoading(authSubmit, true); 
+            setLoading(authSubmit, true);
             authError.classList.add('hidden');
             try {
                 const response = await fetch('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'auth',
-                        password: password
-                    })
+                    body: JSON.stringify({ action: 'auth', password: password })
                 });
                 if (response.ok) {
                     sessionStorage.setItem('muGenAuthenticated', 'true');
@@ -626,7 +688,9 @@
             }
         }
 
-        // --- CUSTOM STYLE (v12と同じ) ---
+
+        // --- ★ v13: CUSTOM STYLE FUNCTIONS ---
+        // (省略: v12と同じ getCustomStyles, saveCustomStyles, handleAddCustomStyle, handleRemoveCustomStyle 関数)
         function getCustomStyles() {
             try {
                 const styles = localStorage.getItem(CUSTOM_STYLES_KEY);
@@ -645,12 +709,11 @@
                 const customStyles = getCustomStyles();
                 const allStyles = [...STYLES, ...customStyles];
                 if (allStyles.map(s => s.toLowerCase()).includes(trimmedStyle.toLowerCase())) {
-                    showToast(`Style "${trimmedStyle}" already exists.`, "warning");
-                    return;
+                    showToast(`Style "${trimmedStyle}" already exists.`, "warning"); return;
                 }
                 customStyles.push(trimmedStyle);
                 saveCustomStyles(customStyles);
-                initStyles(); 
+                initStyles();
                 showToast(`Style "${trimmedStyle}" added.`, "success");
             }
         }
@@ -658,12 +721,13 @@
             let customStyles = getCustomStyles();
             customStyles = customStyles.filter(s => s !== styleToRemove);
             saveCustomStyles(customStyles);
-            initStyles(); 
+            initStyles();
             showToast(`Style "${styleToRemove}" removed.`, "success");
         }
 
 
-        // --- IndexedDB (v12と同じ) ---
+        // --- ★ v13: IndexedDB functions ---
+        // (省略: v12と同じ initDB, saveImageToDB, loadHistory, clearOldHistory, handleClearHistory 関数)
         function initDB() {
             const request = indexedDB.open("muGenDB", 1);
             request.onerror = (event) => { console.error("IndexedDB error:", event.target.errorCode); showToast("Database error. History may not work.", "error"); };
@@ -683,13 +747,8 @@
             const transaction = db.transaction(["images"], "readwrite");
             const objectStore = transaction.objectStore("images");
             const newItem = {
-                prompt: prompt,
-                translatedPrompt: translatedPrompt,
-                base64: base64Data,
-                timestamp: new Date().getTime(),
-                model: model, 
-                aspectRatio: aspectRatio, 
-                styles: styles 
+                prompt: prompt, translatedPrompt: translatedPrompt, base64: base64Data,
+                timestamp: new Date().getTime(), model: model, aspectRatio: aspectRatio, styles: styles
             };
             const request = objectStore.add(newItem);
             request.onsuccess = () => { console.log("Image saved to DB"); loadHistory(); };
@@ -697,7 +756,7 @@
                 console.error("Error saving to DB:", event.target.error);
                 if (event.target.error.name === 'QuotaExceededError') {
                     showToast("History storage is full. Clearing old entries...", "warning");
-                    clearOldHistory(); 
+                    clearOldHistory();
                 }
             };
         }
@@ -706,30 +765,26 @@
             const transaction = db.transaction(["images"], "readonly");
             const objectStore = transaction.objectStore("images");
             const index = objectStore.index("timestamp");
-            const request = index.getAll(null, 500); 
-
+            const request = index.getAll(null, 500);
             request.onsuccess = () => {
-                const items = request.result.reverse(); 
+                const items = request.result.reverse();
                 historyContainer.innerHTML = "";
                 let totalCostUSD = 0;
-                
                 if (items.length === 0) {
                     historyContainer.innerHTML = '<p class="text-gray-400 text-sm">No generated images yet.</p>';
                 } else {
                     items.forEach(item => {
                         const div = document.createElement('div');
                         div.className = "cursor-pointer rounded-lg overflow-hidden relative group";
-                        
-                        let infoParts = [ `[P] ${item.prompt || ''}`, `[M] ${item.model || 'unknown'}`, `[A] ${item.aspectRatio || 'N/A'}` ];
-                        if (item.styles && item.styles.length > 0) {
-                            infoParts.push(`[S] ${item.styles.join(', ')}`);
-                        }
+                        let infoParts = [
+                            `[P] ${item.prompt || ''}`, `[M] ${item.model || 'unknown'}`, `[A] ${item.aspectRatio || 'N/A'}`
+                        ];
+                        if (item.styles && item.styles.length > 0) { infoParts.push(`[S] ${item.styles.join(', ')}`); }
                         const infoText = infoParts.join(' &nbsp;&nbsp;|&nbsp;&nbsp; ');
-
                         div.innerHTML = `
                             <img src="${item.base64}" alt="History thumbnail" class="w-full h-auto object-cover">
                             <div class="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
-                                <button class="text-xs bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded" data-base64="${item.base64.split(',')[1]}" data-prompt="${item.prompt}">
+                                <button class="text-xs bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded" data-base64="${item.base64.split(',')[1]}" data-prompt="${escapeHTML(item.prompt)}">
                                     Edit
                                 </button>
                             </div>
@@ -739,42 +794,38 @@
                                     <span class="history-info-text">${infoText}</span> </div>
                             </div>
                         `;
-                        
                         div.querySelector('img').addEventListener('click', () => showImageInModal(item.base64, item.prompt, item.translatedPrompt, item.base64.split(',')[1]));
-                        
                         div.querySelector('button').addEventListener('click', (e) => {
-                            e.stopPropagation(); 
+                            e.stopPropagation();
                             const base64 = e.currentTarget.dataset.base64;
                             const prompt = e.currentTarget.dataset.prompt;
                             loadUploadedImage(`data:image/png;base64,${base64}`, prompt, false);
                             toggleEditMode(true, ['gemini-2.5-flash-image-preview']);
                         });
-
                         historyContainer.appendChild(div);
 
                         if (item.model === 'imagen-3.0-generate' || 
                             item.model === 'imagen-4.0-generate-preview-06-06' || 
                             item.model === 'imagen-4.0-ultra-generate-preview-06-06' ||
-                            item.model === 'imagen-4.0-fast-generate-001') 
-                        {
+                            item.model === 'imagen-4.0-fast-generate-001') {
                             totalCostUSD += PRICE_IMAGEN_USD;
                         } else if (item.model === 'gemini-2.5-flash-image-preview') {
                             totalCostUSD += PRICE_GEMINI_FLASH_IMAGE_USD;
                         } else if (item.model === 'gemini-2.0-flash-preview-image-generation') { 
                             totalCostUSD += PRICE_GEMINI_FLASH_IMAGE_2_0_USD;
                         } else {
-                            totalCostUSD += PRICE_IMAGEN_USD;
+                            totalCostUSD += PRICE_IMAGEN_USD; // デフォルト
                         }
                     });
                 }
                 statsTotalImages.textContent = items.length;
-                statsCostUsd.textContent = `$${totalCostUSD.toFixed(3)}`; 
+                statsCostUsd.textContent = `$${totalCostUSD.toFixed(3)}`;
                 statsCostJpy.textContent = `¥${Math.round(totalCostUSD * USD_JPY_RATE)}`;
             };
         }
         function clearOldHistory() {
             if (!db) return;
-            objectStore.clear().onsuccess = () => {
+            db.transaction(["images"], "readwrite").objectStore("images").clear().onsuccess = () => {
                 showToast("History storage was full. All history cleared.", "warning");
                 loadHistory();
             };
@@ -787,28 +838,21 @@
                 deleteConfirmError.classList.remove('hidden');
                 return;
             }
-            setLoading(confirmDeleteButton, true); 
+            setLoading(confirmDeleteButton, true);
             deleteConfirmError.classList.add('hidden');
-
             try {
                 const response = await fetch('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'auth',
-                        password: password
-                    })
+                    body: JSON.stringify({ action: 'auth', password: password })
                 });
-
                 if (response.ok) {
                     if (!db) { throw new Error("Database not initialized."); }
-                    const transaction = db.transaction(["images"], "readwrite");
-                    const objectStore = transaction.objectStore("images");
-                    const request = objectStore.clear();
+                    const request = db.transaction(["images"], "readwrite").objectStore("images").clear();
                     request.onsuccess = () => {
                         showToast("History cleared successfully!", "success");
-                        loadHistory(); 
-                        deleteConfirmModal.classList.remove('flex'); 
+                        loadHistory();
+                        deleteConfirmModal.classList.remove('flex');
                     };
                     request.onerror = (e) => { throw new Error("Failed to clear database: " + e.target.error); };
                 } else {
@@ -820,49 +864,53 @@
                 deleteConfirmError.textContent = error.message;
                 deleteConfirmError.classList.remove('hidden');
             } finally {
-                setLoading(confirmDeleteButton, false); 
+                setLoading(confirmDeleteButton, false);
             }
         }
 
-        // --- UI INITIALIZATION (v12と同じ) ---
+        // --- ★ v13: UI INITIALIZATION ---
+        // (省略: v12と同じ initSidebar, toggleSidebar 関数)
         function initSidebar() {
             sidebarToggleButton.addEventListener('click', toggleSidebar);
-            closeSidebarBtn.addEventListener('click', () => toggleSidebar(false)); 
+            closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
         }
         function toggleSidebar(forceOpen) {
             const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
             let shouldBeOpen;
-            if (forceOpen === true) { shouldBeOpen = true; } 
-            else if (forceOpen === false) { shouldBeOpen = false; } 
+            if (forceOpen === true) { shouldBeOpen = true; }
+            else if (forceOpen === false) { shouldBeOpen = false; }
             else { shouldBeOpen = !isSidebarOpen; }
-
             if (!shouldBeOpen) {
                 sidebar.classList.add('-translate-x-full');
-                sidebar.classList.remove('md:translate-x-0'); 
-                mainContent.classList.remove('md:ml-64'); 
+                sidebar.classList.remove('md:translate-x-0');
+                mainContent.classList.remove('md:ml-64');
                 promptFooter.classList.remove('md:left-64'); 
             } else {
                 sidebar.classList.remove('-translate-x-full');
-                sidebar.classList.add('md:translate-x-0'); 
-                mainContent.classList.add('md:ml-64'); 
+                sidebar.classList.add('md:translate-x-0');
+                mainContent.classList.add('md:ml-64');
                 promptFooter.classList.add('md:left-64'); 
             }
         }
+        
+        // (省略: v12と同じ initStyles 関数)
         function initStyles() {
             const container = document.getElementById('styles-container');
             container.innerHTML = ""; 
             const allStyles = [...STYLES, ...getCustomStyles()];
-        
             allStyles.forEach(style => {
-                const isCustom = !STYLES.includes(style); 
+                const isCustom = !STYLES.includes(style);
                 const div = document.createElement('div');
                 div.className = "flex items-center gap-1"; 
-                const inputId = `style-${style.replace(/[^a-zA-Z0-9]/g, '-')}`; 
+                const inputId = `style-${style.replace(/[^a-zA-Z0-9]/g, '-')}`;
                 let labelClass = "cursor-pointer bg-gray-700 text-gray-300 border border-gray-600 rounded-full px-4 py-2 text-sm font-medium hover:bg-gray-600 transition";
                 if (isCustom) {
                      labelClass = "cursor-pointer bg-teal-800 text-teal-100 border border-teal-600 rounded-l-full px-4 py-2 text-sm font-medium hover:bg-teal-700 transition";
                 }
-                div.innerHTML = `<input type="checkbox" id="${inputId}" value="${style}" class="hidden style-checkbox"><label for="${inputId}" class="${labelClass}">${style}</label>`;
+                div.innerHTML = `
+                    <input type="checkbox" id="${inputId}" value="${style}" class="hidden style-checkbox">
+                    <label for="${inputId}" class="${labelClass}">${escapeHTML(style)}</label>
+                `;
                 if (isCustom) {
                     const removeBtn = document.createElement('button');
                     removeBtn.type = "button";
@@ -874,138 +922,163 @@
                 }
                 div.querySelector('input[type="checkbox"]').addEventListener('change', () => {
                     if (!stylesContainer.classList.contains('hidden')) {
-                         updateSelectedStylesPreview(false); 
+                         updateSelectedStylesPreview(false);
                     } else {
-                         updateSelectedStylesPreview(true); 
+                         updateSelectedStylesPreview(true);
                     }
                 });
                 container.appendChild(div);
             });
             const addBtnContainer = document.createElement('div');
-            addBtnContainer.innerHTML = `<button type="button" id="add-style-button" class="cursor-pointer bg-gray-600 text-gray-300 border border-gray-500 rounded-full px-4 py-2 text-sm font-medium hover:bg-indigo-600 hover:text-white transition flex items-center gap-1" data-tooltip="Add custom style"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>Add</button>`;
+            addBtnContainer.innerHTML = `
+                <button type="button" id="add-style-button" class="cursor-pointer bg-gray-600 text-gray-300 border border-gray-500 rounded-full px-4 py-2 text-sm font-medium hover:bg-indigo-600 hover:text-white transition flex items-center gap-1" data-tooltip="Add custom style">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Add
+                </button>
+            `;
             addBtnContainer.querySelector('#add-style-button').addEventListener('click', handleAddCustomStyle);
             container.appendChild(addBtnContainer);
         }
 
         // --- EVENT LISTENERS (v13) ---
+        // ★★★ 変更 (v13) ★★★
         function initListeners() {
+            // 認証
             authForm.addEventListener('submit', handleAuthSubmit);
             
+            // 履歴削除
             clearHistoryButton.addEventListener('click', () => {
                 deleteConfirmModal.classList.add('flex');
-                deleteConfirmPassword.value = ''; 
-                deleteConfirmError.classList.add('hidden'); 
+                deleteConfirmPassword.value = '';
+                deleteConfirmError.classList.add('hidden');
             });
-            deleteConfirmForm.addEventListener('submit', handleClearHistory); 
+            deleteConfirmForm.addEventListener('submit', handleClearHistory);
             cancelDeleteButton.addEventListener('click', () => {
                 deleteConfirmModal.classList.remove('flex');
             });
 
-            generationForm.addEventListener('submit', handleGenerationSubmit); // ★ v13: 変更
-            translateButton.addEventListener('click', handleTranslate); 
+            // ★ 変更: フォームの送信先を handleGenerationSubmit (ルーター) に
+            generationForm.addEventListener('submit', handleGenerationSubmit); 
             
+            // 翻訳
+            translateButton.addEventListener('click', handleTranslate);
+            
+            // プロンプトボタン
             promptCopyButton.addEventListener('click', handlePromptCopy);
             promptClearButton.addEventListener('click', handlePromptClear);
-            promptToggleSizeButton.addEventListener('click', handleTogglePromptSize); 
-            applySuggestionsButton.addEventListener('click', handleApplySuggestions); 
-
+            promptToggleSizeButton.addEventListener('click', handleTogglePromptSize);
+            
+            // 翻訳候補
+            applySuggestionsButton.addEventListener('click', handleApplySuggestions);
+            
+            // モデル選択
             modelsToggleBtn.addEventListener('click', () => toggleModelsAccordion());
             
+            // 画像モーダル
             modalClose.addEventListener('click', () => imageModal.classList.remove('flex'));
             modalCopy.addEventListener('click', handleModalCopy);
             modalRegenerate.addEventListener('click', handleModalRegenerate);
-            modalEdit.addEventListener('click', handleModalEdit); 
-
+            modalEdit.addEventListener('click', handleModalEdit);
             modalZoomIn.addEventListener('click', handleZoomIn);
             modalZoomOut.addEventListener('click', handleZoomOut);
             modalZoomReset.addEventListener('click', handleZoomReset);
+
+            // 編集モードボタン
+            editWithFlashButton.addEventListener('click', () => toggleEditMode(true, ['gemini-2.5-flash-image-preview']));
+            editWithFlash20Button.addEventListener('click', () => toggleEditMode(true, ['gemini-2.0-flash-preview-image-generation']));
             
-            editWithFlashButton.addEventListener('click', () => toggleEditMode(true, ['gemini-2.5-flash-image-preview'])); 
-            editWithFlash20Button.addEventListener('click', () => toggleEditMode(true, ['gemini-2.0-flash-preview-image-generation'])); 
-            
+            // トースト
             toastClose.addEventListener('click', () => hideToast());
             toastCopy.addEventListener('click', () => copyToastMessage());
-            
-            autoRetrySelect.addEventListener('change', () => {
-                if(autoRetrySelect.value === '-1') {
-                    const customRetry = prompt("Enter number of retries:", "100");
-                    if (customRetry && !isNaN(parseInt(customRetry))) {
-                        const val = parseInt(customRetry);
-                        const newOption = new Option(`${val} Times (Custom)`, val, true, true);
-                        autoRetrySelect.add(newOption);
-                    } else { autoRetrySelect.value = '0'; }
-                }
-            });
 
+            // リトライ選択
+            autoRetrySelect.addEventListener('change', handleAutoRetryChange);
+
+            // スタイル
             stylesToggleBtn.addEventListener('click', toggleStylesAccordion);
             selectedStylesPreview.addEventListener('click', () => {
                 if (stylesContainer.classList.contains('hidden')) {
-                    toggleStylesAccordion(); 
+                    toggleStylesAccordion();
                 }
             });
             
+            // プロンプト入力 (Enterキー)
             promptInput.addEventListener('keydown', handlePromptKeydown);
 
+            // D&D
             imageDisplay.addEventListener('dragover', handleDragOver);
             imageDisplay.addEventListener('dragleave', handleDragLeave);
             imageDisplay.addEventListener('drop', handleDrop);
+
+            // ファイルアップロード
             uploadImageButton.addEventListener('click', () => uploadImageInput.click());
             uploadImageInput.addEventListener('change', handleFileSelect);
 
+            // リサイズ
             window.addEventListener('resize', adjustMainContentPadding);
 
+            // スワイプ
             document.addEventListener('touchstart', handleTouchStart, { passive: true });
             document.addEventListener('touchmove', handleTouchMove, { passive: true });
             document.addEventListener('touchend', handleTouchEnd, { passive: true });
 
-            // ★ v13: バックグラウンドトグルのリスナー
-            backgroundModeToggle.addEventListener('change', handleBackgroundModeChange);
+            // ★ 追加 (v13): BGトグルのリスナー
+            bgModeToggle.addEventListener('change', handleBGModeToggle);
         }
+        // ★★★ 変更ここまで ★★★
         
-        // --- LAYOUT & SWIPE (v12と同じ) ---
+        // (省略: v12と同じ adjustMainContentPadding, handleTouchStart, handleTouchMove, handleTouchEnd 関数)
         function adjustMainContentPadding() {
             if (promptFooter && imageContainer) {
                 const footerHeight = promptFooter.offsetHeight;
-                imageContainer.style.paddingBottom = `${footerHeight + 20}px`; 
+                imageContainer.style.paddingBottom = `${footerHeight + 20}px`;
             }
         }
         function handleTouchStart(event) {
-            if (authModal.classList.contains('flex') || deleteConfirmModal.classList.contains('flex')) return; 
+            if (authModal.classList.contains('flex') || deleteConfirmModal.classList.contains('flex')) return;
             const firstTouch = event.touches[0];
-            touchStartX = firstTouch.clientX;
-            touchStartY = firstTouch.clientY;
-            touchMoveX = firstTouch.clientX; 
+            touchStartX = firstTouch.clientX; touchStartY = firstTouch.clientY; touchMoveX = firstTouch.clientX;
         }
         function handleTouchMove(event) {
             if (authModal.classList.contains('flex') || deleteConfirmModal.classList.contains('flex')) return;
             if (Math.abs(event.touches[0].clientX - touchStartX) < Math.abs(event.touches[0].clientY - touchStartY)) {
-                touchStartX = 0; 
-                return;
+                touchStartX = 0; return;
             }
             touchMoveX = event.touches[0].clientX;
         }
         function handleTouchEnd() {
             if (authModal.classList.contains('flex') || deleteConfirmModal.classList.contains('flex')) return;
             if (touchStartX === 0) return; 
-
             const deltaX = touchMoveX - touchStartX;
             const isSidebarOpen = !sidebar.classList.contains('-translate-x-full');
-
             if (isMobile && !isSidebarOpen && touchStartX < 30 && deltaX > 100) {
-                toggleSidebar(true); 
-            }
-            else if (isMobile && isSidebarOpen && deltaX < -100) {
-                toggleSidebar(false); 
+                toggleSidebar(true);
+            } else if (isMobile && isSidebarOpen && deltaX < -100) {
+                toggleSidebar(false);
             }
             touchStartX = 0; touchStartY = 0; touchMoveX = 0;
+        }
+        
+        // (省略: v12と同じ handleAutoRetryChange 関数)
+        function handleAutoRetryChange() {
+            if(autoRetrySelect.value === '-1') {
+                const customRetry = prompt("Enter number of retries:", "100");
+                if (customRetry && !isNaN(parseInt(customRetry))) {
+                    const val = parseInt(customRetry);
+                    const newOption = new Option(`${val} Times (Custom)`, val, true, true);
+                    autoRetrySelect.add(newOption);
+                } else {
+                    autoRetrySelect.value = '0';
+                }
+            }
         }
 
 
         // --- CORE LOGIC (v13) ---
 
-        // (v12と同じ)
+        // (省略: v12と同じ initModels, toggleModelsAccordion, handleModelSelectionChange 関数)
         function initModels() {
-            modelsContainer.innerHTML = ""; 
+            modelsContainer.innerHTML = "";
             for (const [modelId, modelInfo] of Object.entries(MODELS)) {
                 const inputId = `model-${modelId}`;
                 let labelClass = "cursor-pointer text-gray-300 hover:bg-gray-700 p-2 rounded-md flex items-center border border-transparent";
@@ -1016,15 +1089,25 @@
                     modelTypeIcon = `<svg class="w-4 h-4 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>`;
                 }
                 const div = document.createElement('div');
-                div.innerHTML = `<input type="checkbox" id="${inputId}" value="${modelId}" data-type="${modelInfo.type}" class="hidden model-checkbox"><label for="${inputId}" class="${labelClass}">${modelTypeIcon}${modelInfo.name}</label>`;
+                div.innerHTML = `
+                    <input type="checkbox" id="${inputId}" value="${modelId}" data-type="${modelInfo.type}" class="hidden model-checkbox">
+                    <label for="${inputId}" class="${labelClass}">
+                        ${modelTypeIcon}
+                        ${modelInfo.name}
+                    </label>
+                `;
                 modelsContainer.appendChild(div);
                 div.querySelector('input').addEventListener('change', handleModelSelectionChange);
             }
             const defaultModel = document.getElementById('model-imagen-4.0-fast-generate-001');
-            if (defaultModel) { defaultModel.checked = true; }
+            if (defaultModel) {
+                defaultModel.checked = true;
+            } else if (document.getElementById('model-imagen-3.0-generate')) {
+                document.getElementById('model-imagen-3.0-generate').checked = true; // フォールバック
+            }
             document.addEventListener('click', (e) => {
                 if (!modelSelectGroup.contains(e.target) && !modelsContainer.classList.contains('hidden')) {
-                    toggleModelsAccordion(false); 
+                    toggleModelsAccordion(false);
                 }
             });
             updateToolbarForSelection();
@@ -1045,25 +1128,30 @@
             setTimeout(adjustMainContentPadding, 100); 
         }
         function handleModelSelectionChange() {
-            if (!isEditingMode) { updateToolbarForSelection(); }
+            if (!isEditingMode) {
+                updateToolbarForSelection();
+            }
         }
+        
+        // ★★★ 変更 (v13): BGトグルに応じてUI制御 ★★★
+        /**
+         * 選択中のモデルとBGモードに応じてツールバーを制御
+         */
         function updateToolbarForSelection() {
             const selectedModels = getSelectedModels();
             const hasImagen = selectedModels.some(modelId => MODELS[modelId]?.type === 'imagen');
-            
-            // ★ v13: BGモードのトグル状態も考慮
-            const isBGMode = backgroundModeToggle.checked;
+            const isBGMode = bgModeToggle.checked;
 
-            if (hasImagen && !isBGMode) {
-                // FGモードでImagen選択時のみ表示
+            // 1. Imagen系 (Aspect Ratio, Styles)
+            if (hasImagen) {
                 aspectRatioGroup.style.display = 'block';
-                stylesToggleBtn.style.display = 'flex'; 
+                stylesToggleBtn.style.display = 'flex';
             } else {
                 aspectRatioGroup.style.display = 'none';
                 stylesToggleBtn.style.display = 'none';
             }
             
-            // ★ v13: Auto Retryは FGモードの時だけ表示
+            // 2. Auto Retry (FGモードでのみ表示)
             if (isBGMode) {
                 autoRetryGroup.style.display = 'none';
             } else {
@@ -1072,24 +1160,47 @@
 
             setTimeout(adjustMainContentPadding, 100);
         }
+        
+        /**
+         * ★ 新規 (v13): BGトグルが変更されたときの処理
+         */
+        function handleBGModeToggle() {
+            // トグル状態に応じてツールバーを更新
+            updateToolbarForSelection();
+            
+            // アイコンを更新 (BGモードでも編集モードはわかるように)
+            setLoading(generateButton, false); 
+        }
+        // ★★★ 変更ここまで ★★★
+        
+        // (省略: v12と同じ getSelectedModels, updateGridColumns, updatePlaceholderVisibility 関数)
         function getSelectedModels() {
              return Array.from(document.querySelectorAll('.model-checkbox:checked')).map(cb => cb.value);
         }
         function updateGridColumns() {
             const count = imageGridContainer.children.length;
             imageGridContainer.classList.remove('grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3');
-            if (count === 1) { imageGridContainer.classList.add('grid-cols-1'); } 
-            else if (count === 2) { imageGridContainer.classList.add('grid-cols-1', 'md:grid-cols-2'); } 
-            else { imageGridContainer.classList.add('grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3'); }
+            if (count === 1) {
+                imageGridContainer.classList.add('grid-cols-1');
+            } else if (count === 2) {
+                imageGridContainer.classList.add('grid-cols-1', 'md:grid-cols-2');
+            } else {
+                imageGridContainer.classList.add('grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3');
+            }
         }
         function updatePlaceholderVisibility() {
-            if (imageGridContainer.children.length > 0) { placeholder.style.display = 'none'; } 
-            else { placeholder.style.display = 'flex'; }
+            if (imageGridContainer.children.length > 0) {
+                placeholder.style.display = 'none';
+            } else {
+                placeholder.style.display = 'flex';
+            }
         }
+
+        // (省略: v12と同じ toggleStylesAccordion, updateSelectedStylesPreview 関数)
         function toggleStylesAccordion() {
             const isClosing = stylesContainer.classList.toggle('hidden'); 
             stylesChevron.classList.toggle('rotate-180');
-            updateSelectedStylesPreview(isClosing); 
+            updateSelectedStylesPreview(isClosing);
             setTimeout(adjustMainContentPadding, 100);
         }
         function updateSelectedStylesPreview(showPreview = false) {
@@ -1108,6 +1219,8 @@
                 selectedStylesPreview.classList.add('hidden');
             }
         }
+
+        // (省略: v12と同じ handlePromptKeydown 関数)
         function handlePromptKeydown(event) {
             if (isMobile) {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -1131,22 +1244,22 @@
                 lastEnterPress = 0;
             }
         }
+
+        // (省略: v12と同じ clearImageGrid 関数)
         function clearImageGrid() {
             imageGridContainer.innerHTML = '';
             currentEditImageBase64 = null;
-            if (isEditingMode) { toggleEditMode(false); }
-            updatePlaceholderVisibility(); 
-            updateGridColumns(); 
-            // ★ v13: 実行中のポーリングをすべて停止
-            stopAllPolling();
+            if (isEditingMode) {
+                toggleEditMode(false);
+            }
+            updatePlaceholderVisibility();
+            updateGridColumns();
         }
 
-        // ★ v13: 編集モード制御 (BGモードのトグル状態も考慮)
+        // (省略: v12と同じ toggleEditMode 関数)
         function toggleEditMode(forceOn, modelsToSelect = []) { 
             isEditingMode = forceOn;
             const allModelCheckboxes = Array.from(document.querySelectorAll('.model-checkbox'));
-            const isBGMode = backgroundModeToggle.checked;
-
             if (isEditingMode) {
                 if (!currentEditImageBase64) {
                     showToast("No image to edit. Generate or upload an image first.", "warning");
@@ -1156,23 +1269,18 @@
                 promptInput.placeholder = "Enter edit instructions...";
                 optionsToolbar.style.display = 'flex';
                 modelsToggleBtn.style.display = 'block';
-                
-                // ★ v13: BGモードならAuto Retry非表示
-                if (isBGMode) { autoRetryGroup.style.display = 'none'; }
-                else { autoRetryGroup.style.display = 'block'; }
-                
-                aspectRatioGroup.style.display = 'none'; 
-                stylesToggleBtn.style.display = 'none'; 
+                // autoRetryGroup は handleBGModeToggle で制御
+                aspectRatioGroup.style.display = 'none';
+                stylesToggleBtn.style.display = 'none';
                 
                 allModelCheckboxes.forEach(cb => {
                     const modelType = cb.dataset.type;
                     if (modelType === 'gemini-edit') {
-                        cb.parentElement.style.display = 'block'; 
-                        if (modelsToSelect.includes(cb.value)) { cb.checked = true; } 
-                        else { cb.checked = false; }
+                        cb.parentElement.style.display = 'block';
+                        cb.checked = modelsToSelect.includes(cb.value);
                     } else {
-                        cb.parentElement.style.display = 'none'; 
-                        cb.checked = false; 
+                        cb.parentElement.style.display = 'none';
+                        cb.checked = false;
                     }
                 });
                 imageDisplay.classList.add('ring-4', 'ring-indigo-500');
@@ -1180,18 +1288,19 @@
                 editModeIndicator.textContent = `🎨 Editing Mode (Gemini 2.0 / 2.5) - Select models to use for editing.`;
                 editModeIndicator.classList.remove('hidden');
             } else {
-                // --- 編集モード解除 ---
-                promptInput.placeholder = "Enter your prompt...";
+                promptInput.placeholder = "Enter your prompt... (Non-English will be translated)";
                 optionsToolbar.style.display = 'flex';
                 modelsToggleBtn.style.display = 'block';
-                // (Aspect/Styles/Retry は updateToolbarForSelection で制御)
+                // autoRetryGroup は handleBGModeToggle で制御
+
                 let defaultModelChecked = false;
                 allModelCheckboxes.forEach(cb => {
                     cb.parentElement.style.display = 'block';
                     if (cb.value === 'imagen-4.0-fast-generate-001') {
-                         cb.checked = true;
-                         defaultModelChecked = true;
-                    } else { cb.checked = false; }
+                         cb.checked = true; defaultModelChecked = true;
+                    } else {
+                         cb.checked = false;
+                    }
                 });
                 if (!defaultModelChecked && document.getElementById('model-imagen-3.0-generate')) {
                      document.getElementById('model-imagen-3.0-generate').checked = true;
@@ -1200,19 +1309,11 @@
                 editModeIndicator.classList.add('hidden');
             }
             updateToolbarForSelection();
-            setLoading(generateButton, false); 
+            setLoading(generateButton, false);
             setTimeout(adjustMainContentPadding, 100);
         }
 
-        // ★ v13: BGトグル変更時のツールバー更新
-        function handleBackgroundModeChange() {
-            updateToolbarForSelection();
-            if (isEditingMode) {
-                 toggleEditMode(true, getSelectedModels()); // 編集モードのツールバーも更新
-            }
-        }
-
-        // (v12と同じ: 翻訳/候補適用/エスケープ)
+        // (省略: v12と同じ handleTranslate, handleApplySuggestions, escapeHTML 関数)
         async function handleTranslate() {
             const prompt = promptInput.value;
             if (!prompt) { showToast("Please enter text to translate", "warning"); return; }
@@ -1220,14 +1321,19 @@
             promptSuggestionsList.innerHTML = '';
             setLoading(translateButton, true);
             try {
+                apiKeyCounter++; // 翻訳でもキーをローテーション
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 100000); 
                 const response = await fetchWithRetry('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'translate', prompt: prompt })
-                }, 0, controller.signal); 
-                clearTimeout(timeoutId); 
+                    body: JSON.stringify({
+                        action: 'translate',
+                        prompt: prompt,
+                        keyIndex: apiKeyCounter // ★ v13: キーインデックスを渡す
+                    })
+                }, 0, controller.signal);
+                clearTimeout(timeoutId);
                 const data = await response.json();
                 if (response.ok) {
                     const translatedText = data.translatedPrompt;
@@ -1236,24 +1342,31 @@
                         const bracketCandidates = translatedText.split(/\n\s*(?=\[)/).filter(p => p.trim().length > 0);
                         if (bracketCandidates.length > 1) { candidates = bracketCandidates; }
                     }
-                    candidates = candidates.map(c => c.trim().replace(/^\[.*?\]\s*/, '').replace(/^[0-9]\.\s*/, '').trim()).filter(c => c.length > 0); 
+                    candidates = candidates.map(c => 
+                        c.trim().replace(/^\[.*?\]\s*/, '').replace(/^[0-9]\.\s*/, '').trim()
+                    ).filter(c => c.length > 0);
                     if (candidates.length > 1) {
-                        promptInput.value = ""; 
-                        promptSuggestionsList.innerHTML = ''; 
+                        promptInput.value = "";
+                        promptSuggestionsList.innerHTML = '';
                         candidates.forEach((candidate, index) => {
                             const suggestionId = `suggestion-${index}`;
                             const div = document.createElement('div');
                             div.className = "flex items-center bg-gray-800 p-2 rounded";
-                            div.innerHTML = `<input id="${suggestionId}" type="checkbox" value="${escapeHTML(candidate)}" class="suggestion-checkbox w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"><label for="${suggestionId}" class="ml-2 text-sm text-gray-200 cursor-pointer">${escapeHTML(candidate)}</label>`;
+                            div.innerHTML = `
+                                <input id="${suggestionId}" type="checkbox" value="${escapeHTML(candidate)}" class="suggestion-checkbox w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500">
+                                <label for="${suggestionId}" class="ml-2 text-sm text-gray-200 cursor-pointer">${escapeHTML(candidate)}</label>
+                            `;
                             promptSuggestionsList.appendChild(div);
                         });
                         promptSuggestionsContainer.classList.remove('hidden');
                         showToast("Multiple suggestions found", "info");
                     } else {
-                        promptInput.value = translatedText; 
+                        promptInput.value = translatedText;
                         showToast("Translation successful", "success");
                     }
-                } else { throw new Error(data.error || "Translation failed"); }
+                } else {
+                    throw new Error(data.error || "Translation failed");
+                }
             } catch (error) {
                 console.error("Translate error:", error);
                 if (error.name !== 'AbortError') { showToast(error.message, "error"); }
@@ -1265,11 +1378,11 @@
         }
         function handleApplySuggestions() {
             const selectedCandidates = Array.from(document.querySelectorAll('.suggestion-checkbox:checked'));
-            const combinedPrompt = selectedCandidates.map(cb => cb.value).join(', '); 
+            const combinedPrompt = selectedCandidates.map(cb => cb.value).join(', ');
             if (combinedPrompt.length === 0) { showToast("Please select at least one suggestion", "warning"); return; }
             promptInput.value = combinedPrompt;
-            promptSuggestionsContainer.classList.add('hidden'); 
-            promptSuggestionsList.innerHTML = ''; 
+            promptSuggestionsContainer.classList.add('hidden');
+            promptSuggestionsList.innerHTML = '';
             setTimeout(adjustMainContentPadding, 100);
         }
         function escapeHTML(str) {
@@ -1280,269 +1393,176 @@
         }
 
 
-        // ★★★ v13: 生成ロジック (FG/BG分岐) ★★★
-        async function handleGenerationSubmit(event) {
-            if (event) event.preventDefault(); 
+        // ★★★ 変更 (v13): 生成処理のルーター ★★★
+        /**
+         * 生成ボタン押下時のメインルーター (v13)
+         * FG/BGモードを判定し、それぞれの処理を呼び出す
+         */
+        function handleGenerationSubmit(event) {
+            if (event) event.preventDefault();
             
-            // キャンセルロジック (FGモード)
-            if (generationInProgress) {
-                if (currentFetchController) {
-                    currentFetchController.abort(); // FGのフェッチをキャンセル
-                    showToast("Foreground generations cancelled", "info");
+            const isBGMode = bgModeToggle.checked;
+            
+            // --- キャンセル処理 ---
+            // FGモードで実行中か、BGモードでポーリング中なら、キャンセル
+            if (generationInProgress_FG || isPolling_BG) {
+                if (generationInProgress_FG && currentFetchController_FG) {
+                    currentFetchController_FG.abort(); // FGのFetchをキャンセル
+                    showToast("FG generations cancelled", "info");
                 }
-                // BGモードのポーリングはキャンセルしない
+                if (isPolling_BG) {
+                    stopPolling_BG(true); // BGのポーリングをキャンセル
+                    showToast("BG generation polling cancelled", "info");
+                }
+                // setLoading(false) は各処理の finally で呼ばれる
                 return;
             }
             
+            // --- 翻訳候補エリアを閉じる ---
             if (!promptSuggestionsContainer.classList.contains('hidden')) {
                  promptSuggestionsContainer.classList.add('hidden');
                  setTimeout(adjustMainContentPadding, 100);
             }
 
+            // --- 入力チェック ---
             const prompt = promptInput.value;
             const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value);
             let finalPrompt = prompt;
 
             const selectedModels = getSelectedModels();
             if (selectedModels.length === 0) {
-                showToast("Please select at least one model", "warning");
-                return;
+                showToast("Please select at least one model", "warning"); return;
             }
 
             if (isEditingMode && !prompt && selectedStyles.length > 0) {
                 finalPrompt = `Apply the following style(s): ${selectedStyles.join(', ')}`;
             } else if (!prompt) {
-                showToast("Please enter a prompt", "warning");
-                return;
+                showToast("Please enter a prompt", "warning"); return;
             }
             
             if (isEditingMode && !currentEditImageBase64) {
                  showToast("No image loaded for editing.", "warning");
-                 toggleEditMode(false);
-                 return;
+                 toggleEditMode(false); return;
             }
-            
-            // ★ グリッドのクリア (v12と同じ)
-            if (isEditingMode) { imageGridContainer.innerHTML = ''; } 
-            else { imageGridContainer.innerHTML = ''; }
+
+            // --- グリッド初期化 ---
+            if (isEditingMode) {
+                imageGridContainer.innerHTML = ''; // 編集時はベース画像を消す
+            } else {
+                imageGridContainer.innerHTML = ''; // 通常生成時もクリア
+            }
             placeholder.style.display = 'none'; 
             updateGridColumns();
-            // ★ v13: 既存のポーリングを停止
-            stopAllPolling();
 
-            generationInProgress = true;
-            runningGenerations.clear(); 
-            currentFetchController = new AbortController();
+            // --- モードに応じて処理を分岐 ---
+            if (isBGMode) {
+                handleGenerationSubmit_BG(finalPrompt, selectedModels, selectedStyles);
+            } else {
+                handleGenerationSubmit_FG(finalPrompt, selectedModels, selectedStyles);
+            }
+        }
+        
+
+        // ★★★ 変更 (v13): フォアグラウンド (FG) 生成処理 ★★★
+        /**
+         * FG: フォアグラウンド生成 (v12の handleGenerationSubmit と同等)
+         */
+        async function handleGenerationSubmit_FG(finalPrompt, selectedModels, selectedStyles) {
+            
+            generationInProgress_FG = true;
+            runningGenerations_FG.clear();
+            currentFetchController_FG = new AbortController();
             setLoading(generateButton, true); // Stopアイコン
             
             const isPrivateMode = document.getElementById('private-mode-toggle').checked;
-            const isBGMode = backgroundModeToggle.checked; // ★ v13: BGモードか
+            const retryCount = parseInt(autoRetrySelect.value, 10);
             
-            const generationPromises = [];
-
             for (const modelId of selectedModels) {
                 apiKeyCounter++;
                 const modelInfo = MODELS[modelId];
-                const cardId = `image-card-${modelId}-${apiKeyCounter}`;
-                
-                // ★ v13: BGモードではアスペクト比とスタイルは送信しない
-                let payloadStyles = (isBGMode || modelInfo.type === 'gemini-edit') ? [] : selectedStyles;
-                let payloadAspectRatio = (isBGMode || modelInfo.type === 'gemini-edit') ? '1:1' : aspectRatioSelect.value;
 
-                // 1. UIにカードを作成
-                const card = createImageCard(cardId, modelInfo.name, isBGMode); // ★ v13
+                const cardId = `image-card-fg-${modelId}-${apiKeyCounter}`;
+                const card = createImageCard(cardId, modelInfo.name, false); // FGモード
                 imageGridContainer.appendChild(card);
-                runningGenerations.add(cardId);
-                
-                // ★ v13: 実行ペイロード
+
+                const isGeminiJob = modelInfo.type === 'gemini-edit';
+                const isImagenJob = modelInfo.type === 'imagen';
+
                 const payload = {
+                    action: isImagenJob ? 'generate_fg' : 'edit_fg', // ★ v13: アクション名変更
                     prompt: finalPrompt,
                     model: modelId, 
                     keyIndex: apiKeyCounter, 
-                    aspectRatio: payloadAspectRatio, 
-                    styles: payloadStyles,
-                    baseImage: (isEditingMode || modelInfo.type === 'gemini-edit') ? currentEditImageBase64 : null
+                    aspectRatio: aspectRatioSelect.value, 
+                    styles: selectedStyles,
+                    baseImage: (isEditingMode || isGeminiJob) ? currentEditImageBase64 : null
                 };
 
-                let promise;
-                if (isBGMode) {
-                    // ★★★ v13: バックグラウンド処理 ★★★
-                    payload.action = 'generate_bg';
-                    promise = fetch('/api/generate', { // BGリクエスト
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.jobId) {
-                            // 予約成功
-                            showToast(`Job queued for ${modelInfo.name}`, "info");
-                            startPolling(cardId, data.jobId, payload); // ★ ポーリング開始
-                        } else {
-                            throw new Error(data.error || "Failed to queue job");
-                        }
-                    })
-                    .catch(error => {
-                        // 予約失敗
-                        console.error(`Queue error for ${modelId}:`, error);
+                runningGenerations_FG.add(cardId);
+
+                const promise = fetchWithRetry('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }, retryCount, currentFetchController_FG.signal) // ★ v13: FGのController
+                .then(response => response.json())
+                .then(data => {
+                    // 成功
+                    if (data.error) throw new Error(data.error); // API側でキャッチしたエラー
+                    
+                    const base64 = `data:image/png;base64,${data.base64}`;
+                    updateImageCard(cardId, base64, finalPrompt, data.translatedPrompt || finalPrompt, data.base64, null, isPrivateMode);
+                    saveImageToDB(finalPrompt, data.translatedPrompt || finalPrompt, base64, modelId, aspectRatioSelect.value, selectedStyles); 
+                    
+                    if (!currentEditImageBase64 && data.base64) {
+                        currentEditImageBase64 = data.base64;
+                    }
+                })
+                .catch(error => {
+                    // 失敗 or キャンセル
+                    if (error.name !== 'AbortError') {
+                        console.error(`FG Generation error for ${modelId}:`, error);
                         updateImageCard(cardId, null, finalPrompt, null, null, error.message, isPrivateMode);
-                        sendErrorToGAS(payload, `Queue Error: ${error.message}`);
-                        runningGenerations.delete(cardId); // 予約失敗は即完了
-                    });
-
-                } else {
-                    // ★★★ v13: フォアグラウンド処理 (v12と同じ) ★★★
-                    const retryCount = parseInt(autoRetrySelect.value, 10);
-                    const isGeminiJob = modelInfo.type === 'gemini-edit';
-                    
-                    payload.action = (isGeminiJob && !isEditingMode) ? 'edit' : (isEditingMode ? 'edit' : 'generate_fg');
-                    
-                    promise = fetchWithRetry('/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }, retryCount, currentFetchController.signal)
-                    .then(response => response.json())
-                    .then(data => {
-                        // 成功
-                        const base64 = `data:image/png;base64,${data.base64}`;
-                        updateImageCard(cardId, base64, finalPrompt, data.translatedPrompt || finalPrompt, data.base64, null, isPrivateMode);
-                        saveImageToDB(finalPrompt, data.translatedPrompt || finalPrompt, base64, modelId, payload.aspectRatio, payload.styles); 
-                        if (!currentEditImageBase64 && data.base64) {
-                            currentEditImageBase64 = data.base64;
+                        // FGでは fetchWithRetry 内でエラーをGASに送る (v12互換)
+                        // ※ generate.js 側でエラー時にGAS送信するようになったので、ここでは不要
+                    } else {
+                        console.log(`FG Generation cancelled for ${modelId}`);
+                        updateImageCard(cardId, null, finalPrompt, null, null, "Cancelled", isPrivateMode);
+                    }
+                })
+                .finally(() => {
+                    runningGenerations_FG.delete(cardId);
+                    if (runningGenerations_FG.size === 0) {
+                        generationInProgress_FG = false;
+                        currentFetchController_FG = null;
+                        setLoading(generateButton, false); // Send/Editアイコン
+                        
+                        if (isEditingMode && !promptInput.value && selectedStyles.length > 0) {
+                             promptInput.value = "";
                         }
-                    })
-                    .catch(error => {
-                        // 失敗 (リトライ含む) or キャンセル
-                        if (error.name !== 'AbortError') {
-                            console.error(`Generation error for ${modelId}:`, error);
-                            updateImageCard(cardId, null, finalPrompt, null, null, error.message, isPrivateMode); 
-                            sendErrorToGAS(payload, error.message);
-                        } else {
-                            console.log(`Generation cancelled for ${modelId}`);
-                            updateImageCard(cardId, null, finalPrompt, null, null, "Cancelled", isPrivateMode);
-                        }
-                    })
-                    .finally(() => {
-                        runningGenerations.delete(cardId);
-                        checkAllGenerationsDone(); // ★ 完了チェック
-                    });
-                }
+                    }
+                });
                 
-                generationPromises.push(promise);
                 updateGridColumns();
-            } // end for loop
-        } 
-
-        /**
-         * ★ v13: 全てのジョブが完了したかチェック (FG/BG共通)
-         */
-        function checkAllGenerationsDone() {
-             // FGジョブもBGジョブも（ポーリング含め）残っていなければ完了
-             if (runningGenerations.size === 0 && activePollingJobs.size === 0) {
-                generationInProgress = false;
-                currentFetchController = null;
-                setLoading(generateButton, false); // Send/Editアイコン
-                
-                if (isEditingMode && !promptInput.value && Array.from(document.querySelectorAll('.style-checkbox:checked')).length > 0) {
-                     promptInput.value = "";
-                }
-            }
+            } 
         }
 
         /**
-         * ★ v13: ポーリングを開始
+         * FG: リトライ付きFetch (v12とほぼ同じ)
          */
-        function startPolling(cardId, jobId, originalPayload) {
-            const intervalId = setInterval(async () => {
-                try {
-                    const response = await fetch('/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'check_status', jobId: jobId })
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`Polling check failed: ${response.statusText}`);
-                    }
-                    
-                    const data = await response.json();
-
-                    if (data.status === 'complete') {
-                        // ★ 完了
-                        stopPolling(cardId);
-                        const base64 = `data:image/png;base64,${data.base64}`;
-                        const isPrivateMode = document.getElementById('private-mode-toggle').checked;
-                        
-                        updateImageCard(cardId, base64, originalPayload.prompt, data.translatedPrompt || originalPayload.prompt, data.base64, null, isPrivateMode);
-                        
-                        // BGモードではASとStyleは保存しない (payloadに依存)
-                        saveImageToDB(originalPayload.prompt, data.translatedPrompt || originalPayload.prompt, base64, originalPayload.model, "N/A (BG)", []); 
-                        
-                        if (!currentEditImageBase64 && data.base64) {
-                            currentEditImageBase64 = data.base64;
-                        }
-
-                    } else if (data.status === 'error') {
-                        // ★ エラー
-                        stopPolling(cardId);
-                        console.error(`BG Job ${jobId} failed:`, data.error);
-                        updateImageCard(cardId, null, originalPayload.prompt, null, null, `BG Error: ${data.error}`, false);
-                        // (GASへのエラー送信はConsumer側で実施済み)
-
-                    } else if (data.status === 'pending') {
-                        // ★ 実行中 (何もしない)
-                        console.log(`Job ${jobId} is pending...`);
-                    }
-
-                } catch (error) {
-                    console.error("Polling error:", error);
-                    // ポーリング自体に失敗した場合 (ネットワークエラーなど)
-                    stopPolling(cardId);
-                    updateImageCard(cardId, null, originalPayload.prompt, null, null, `Polling Error: ${error.message}`, false);
-                    runningGenerations.delete(cardId); // 実行中リストからも削除
-                    checkAllGenerationsDone();
-                }
-
-            }, POLLING_INTERVAL);
-
-            activePollingJobs.set(cardId, { jobId: jobId, intervalId: intervalId });
-        }
-        
-        /**
-         * ★ v13: 特定のポーリングを停止
-         */
-        function stopPolling(cardId) {
-            if (activePollingJobs.has(cardId)) {
-                const { intervalId } = activePollingJobs.get(cardId);
-                clearInterval(intervalId);
-                activePollingJobs.delete(cardId);
-                runningGenerations.delete(cardId); // 実行中リストからも削除
-                checkAllGenerationsDone(); // 完了チェック
-            }
-        }
-
-        /**
-         * ★ v13: 全てのポーリングを停止 (グリッドクリア時)
-         */
-        function stopAllPolling() {
-            activePollingJobs.forEach(({ intervalId }, cardId) => {
-                clearInterval(intervalId);
-                runningGenerations.delete(cardId);
-            });
-            activePollingJobs.clear();
-            checkAllGenerationsDone();
-        }
-
-        // (v12と同じ)
         async function fetchWithRetry(url, options, retries = 0, signal = null) {
             let attempt = 0;
             const maxRetries = retries < 0 ? 0 : retries; 
-            if (signal) { options.signal = signal; }
+
+            if (signal) {
+                options.signal = signal;
+            }
 
             while (attempt <= maxRetries) {
                 try {
+                    if (attempt > 0) {
+                       showToast(`Retrying... (Attempt ${attempt} of ${maxRetries})`, "warning", 2000);
+                    }
                     const response = await fetch(url, options);
                     if (!response.ok) {
                         const errorData = await response.json().catch(() => ({ error: `Server error: ${response.status}` }));
@@ -1550,7 +1570,9 @@
                     }
                     return response; 
                 } catch (error) {
-                    if (error.name === 'AbortError') { throw error; }
+                    if (error.name === 'AbortError') {
+                        throw error;
+                    }
                     console.warn(`Attempt ${attempt} failed:`, error.message);
                     if (attempt === maxRetries) {
                         if (error.message.includes('401') || error.message.includes('Authentication failed')) {
@@ -1572,20 +1594,215 @@
                 }
             }
         }
-        function sendErrorToGAS(payload, errorMessage) {
-            fetch('/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'logError',
-                    prompt: payload.prompt,
-                    model: payload.model,
-                    error: errorMessage
-                })
-            }).catch(err => { console.warn("Failed to log error to GAS:", err); });
+        
+        // (省略: v12の sendErrorToGAS は v13では generate.js 側に集約)
+        
+        // ★★★ 新規 (v13): バックグラウンド (BG) 生成処理 ★★★
+        
+        /**
+         * BG: バックグラウンドジョブの投入とポーリング開始
+         */
+        async function handleGenerationSubmit_BG(finalPrompt, selectedModels, selectedStyles) {
+            
+            isPolling_BG = true; // ★ ポーリング中に変更
+            setLoading(generateButton, true); // Stopアイコン
+            
+            const isPrivateMode = document.getElementById('private-mode-toggle').checked;
+            
+            for (const modelId of selectedModels) {
+                apiKeyCounter++;
+                const modelInfo = MODELS[modelId];
+                
+                // ジョブIDとカードIDを生成
+                const jobId = `${Date.now()}-${modelId}-${Math.random().toString(36).substring(2, 9)}`;
+                const cardId = `image-card-bg-${jobId}`;
+                
+                // プレースホルダーカード (BGモード)
+                const card = createImageCard(cardId, modelInfo.name, true); // BGモード
+                imageGridContainer.appendChild(card);
+                updateGridColumns();
+
+                const isGeminiJob = modelInfo.type === 'gemini-edit';
+
+                // KVに保存するジョブペイロード
+                const jobPayload = {
+                    prompt: finalPrompt,
+                    model: modelId, 
+                    aspectRatio: aspectRatioSelect.value, 
+                    styles: selectedStyles,
+                    baseImage: (isEditingMode || isGeminiJob) ? currentEditImageBase64 : null
+                };
+
+                // KVにジョブを投入 (ウェイターAPI経由)
+                try {
+                    const response = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'submit_bg_job',
+                            jobId: jobId,
+                            model: modelId,
+                            keyIndex: apiKeyCounter,
+                            jobPayload: jobPayload
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.error || "Failed to submit BG job");
+                    }
+                    
+                    // ジョブ投入成功！ ポーリングリストに追加
+                    pollingJobs_BG.add({
+                        jobId: jobId,
+                        cardId: cardId,
+                        modelName: modelInfo.name,
+                        prompt: finalPrompt,
+                        translatedPrompt: finalPrompt, // 初期値
+                        isPrivateMode: isPrivateMode,
+                        model: modelId, // DB保存用
+                        aspectRatio: aspectRatioSelect.value, // DB保存用
+                        styles: selectedStyles // DB保存用
+                    });
+                    
+                } catch (error) {
+                    // ジョブ投入失敗 (KVエラーなど)
+                    console.error(`Failed to submit BG job for ${modelId}:`, error);
+                    updateImageCard(cardId, null, finalPrompt, null, null, `Job submission failed: ${error.message}`, isPrivateMode);
+                }
+            } // end for loop
+            
+            // 全てのジョブ投入が終わったら、ポーリングを開始
+            if (pollingJobs_BG.size > 0) {
+                startPolling_BG();
+            } else {
+                // 1件も投入できなかった
+                isPolling_BG = false;
+                setLoading(generateButton, false);
+            }
+        }
+        
+        /**
+         * BG: ポーリングを開始
+         */
+        function startPolling_BG() {
+            if (pollingIntervalId_BG) {
+                clearInterval(pollingIntervalId_BG); // 念のため既存をクリア
+            }
+            
+            console.log(`Starting BG polling for ${pollingJobs_BG.size} jobs...`);
+            
+            // ポーリングタイマーを設定
+            pollingIntervalId_BG = setInterval(async () => {
+                
+                // ポーリング対象がなくなったらタイマー停止
+                if (pollingJobs_BG.size === 0) {
+                    stopPolling_BG(false); // 正常停止
+                    return;
+                }
+
+                // ポーリング中の全ジョブを並列でチェック
+                const checkPromises = [];
+                for (const job of pollingJobs_BG) {
+                    checkPromises.push(checkJobStatus_BG(job));
+                }
+                
+                await Promise.allSettled(checkPromises);
+                
+            }, POLLING_INTERVAL);
+        }
+        
+        /**
+         * BG: ジョブのステータスを1件チェック
+         */
+        async function checkJobStatus_BG(job) {
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'check_bg_job',
+                        jobId: job.jobId
+                    })
+                });
+                
+                if (!response.ok) {
+                    // ネットワークエラーなど
+                    throw new Error(`Polling check failed: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.status === "completed") {
+                    // ★ 完了！
+                    console.log(`Job ${job.jobId} completed!`);
+                    const base64 = `data:image/png;base64,${data.base64}`;
+                    
+                    // カード更新
+                    updateImageCard(job.cardId, base64, job.prompt, data.translatedPrompt || job.prompt, data.base64, null, job.isPrivateMode);
+                    
+                    // DB保存
+                    saveImageToDB(job.prompt, data.translatedPrompt || job.prompt, base64, job.model, job.aspectRatio, job.styles); 
+                    
+                    // ベース画像設定
+                    if (!currentEditImageBase64 && data.base64) {
+                        currentEditImageBase64 = data.base64;
+                    }
+                    
+                    // ポーリングリストから削除
+                    pollingJobs_BG.delete(job);
+                    
+                } else if (data.status === "error") {
+                    // ★ 失敗 (リトライオーバー)
+                    console.error(`Job ${job.jobId} failed: ${data.error}`);
+                    updateImageCard(job.cardId, null, job.prompt, null, null, `BG Error: ${data.error}`, job.isPrivateMode);
+                    // ポーリングリストから削除
+                    pollingJobs_BG.delete(job);
+                    
+                } else if (data.status === "pending") {
+                    // ⏳ まだ処理中
+                    console.log(`Job ${job.jobId} is still pending...`);
+                    // 何もしない (次のインターバルで再チェック)
+                    
+                } else {
+                    // 不明なステータス
+                    throw new Error(`Unknown job status: ${data.status}`);
+                }
+                
+            } catch (error) {
+                // ポーリング自体が失敗
+                console.error(`Error polling for job ${job.jobId}:`, error);
+                // (この場合、ポーリングは続行される)
+            }
+        }
+        
+        /**
+         * BG: ポーリングを停止
+         */
+        function stopPolling_BG(wasCancelled) {
+            if (pollingIntervalId_BG) {
+                clearInterval(pollingIntervalId_BG);
+                pollingIntervalId_BG = null;
+            }
+            
+            if (wasCancelled) {
+                // キャンセルボタンが押された場合
+                // ポーリング中のカードを「キャンセル」表示にする
+                for (const job of pollingJobs_BG) {
+                    updateImageCard(job.cardId, null, job.prompt, null, null, "Cancelled (BG)", job.isPrivateMode);
+                }
+            }
+            
+            // リストをクリアし、状態をリセット
+            pollingJobs_BG.clear();
+            isPolling_BG = false;
+            setLoading(generateButton, false); // ボタンアイコンを戻す
+            console.log("BG polling stopped.");
         }
 
-        // --- PROMPT HELPERS (v12と同じ) ---
+
+        // --- ★ v13: PROMPT HELPERS ---
+        // (省略: v12と同じ handlePromptCopy, handlePromptClear, handleTogglePromptSize 関数)
         function handlePromptCopy() {
             const textToCopy = promptInput.value;
             if (!textToCopy) { showToast("Nothing to copy", "info"); return; }
@@ -1609,7 +1826,8 @@
             setTimeout(adjustMainContentPadding, 100);
         }
 
-        // --- MODAL & TOAST (v12と同じ) ---
+        
+         // --- MODAL & TOAST (v12と同じ) ---
         function showImageInModal(base64DataUrl, prompt, translatedPrompt, rawBase64) {
             modalImage.src = base64DataUrl;
             modalPrompt.textContent = translatedPrompt || prompt;
