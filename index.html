@@ -3,23 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>muGen - AI Image Generator</title>
+    <title>muGen - AI Image Generator (v14)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Inter Font (Mac-like) */
+        /* (v13と同じ Inter Font, Custom scrollbar, Noise Animation, Custom Checkbox) */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        html, body {
-            font-family: 'Inter', sans-serif;
-            overscroll-behavior: none;
-        }
-
-        /* Custom scrollbar for sidebar */
+        html, body { font-family: 'Inter', sans-serif; overscroll-behavior: none; }
         .sidebar-scroll::-webkit-scrollbar { width: 4px; }
         .sidebar-scroll::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 4px; }
         .sidebar-scroll::-webkit-scrollbar-track { background-color: #1f2937; }
-
-        /* Dynamic Noise Animation */
         .noise-container {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             overflow: hidden; background: #111827; z-index: 10;
@@ -41,16 +33,15 @@
             80% { transform: translate(-15%, 0); } 90% { transform: translate(10%, 5%); }
             100% { transform: translate(5%, 0); }
         }
-
-        /* Custom Checkbox */
         .style-checkbox:checked + label {
             background-color: #4f46e5; border-color: #4f46e5; color: #ffffff;
         }
-        .model-checkbox:checked + label {
+        .model-checkbox:checked + label,
+        .edit-model-checkbox:checked + label { /* ★ v14: Editも */
             background-color: #3730a3; border-color: #4f46e5; color: #ffffff; font-weight: 500;
         }
 
-        /* Modal styles */
+        /* (v13と同じ Modal styles, Tooltip, Chevron, Drag over, History Marquee, Toast, Image Card, Blur, Toggle) */
         .modal {
             display: none; position: fixed; z-index: 50; inset: 0;
             overflow-y: auto; background-color: rgba(0, 0, 0, 0.7);
@@ -59,8 +50,6 @@
         .modal.flex { display: flex; }
         #auth-modal { z-index: 60; }
         #delete-confirm-modal { z-index: 60; }
-
-        /* Modal Image Zoom */
         #modal-image-wrapper { transition: all 0.3s ease; }
         #modal-image {
             transition: transform 0.2s ease-out;
@@ -68,8 +57,6 @@
             image-rendering: crisp-edges;
             transform-origin: top left;
         }
-
-        /* Tooltip */
         [data-tooltip] { position: relative; }
         [data-tooltip]:hover::after {
             content: attr(data-tooltip); position: absolute; bottom: 110%;
@@ -78,16 +65,10 @@
             font-size: 12px; white-space: nowrap; z-index: 60;
             opacity: 1; transition: opacity 0.2s;
         }
-
-        /* Chevron rotation */
         .rotate-180 { transform: rotate(180deg); }
-
-        /* Drag over effect */
         .drag-over {
             border-style: dashed; border-color: #4f46e5; background-color: #1f2937;
         }
-
-        /* History Marquee */
         .history-info-container {
             width: 100%; overflow: hidden; white-space: nowrap;
             position: absolute; bottom: 0; left: 0;
@@ -107,11 +88,7 @@
             0%   { transform: translateX(0); }
             100% { transform: translateX(-50%); } 
         }
-
-        /* Toast */
         #toast { max-width: 400px; word-break: break-word; }
-        
-        /* Image Card */
         .image-card {
             position: relative; background-color: #374151; /* gray-700 */
             border-radius: 0.5rem; /* rounded-lg */
@@ -121,34 +98,51 @@
             padding: 0.5rem; /* p-2 */
             text-align: center; overflow: hidden;
         }
-
-        /* ★★★ 修正箇所 (v13) ★★★ */
-        /* ぼかし用フィルター */
         .image-blurred {
             filter: blur(16px);
             transition: filter 0.2s ease-in-out;
         }
-        /* BGトグルスイッチ */
         .toggle-bg:checked + .toggle-label {
             background-color: #16a34a; /* green-600 */
         }
-        .toggle-bg:checked + .toggle-label > span { /* after擬似要素の代わり */
+        .toggle-bg:checked + .toggle-label > span {
             transform: translateX(100%);
             border-color: #ffffff;
         }
         .toggle-label {
             transition: background-color 0.2s ease-in-out;
         }
-        .toggle-label > span { /* after擬似要素の代わり */
+        .toggle-label > span {
             transition: transform 0.2s ease-in-out;
         }
-        /* ★★★ 修正箇所ここまで ★★★ */
+
+        /* ★★★ 追加 (v14) ★★★ */
+        /* アコーディオンプレビュー */
+        .accordion-preview {
+            font-size: 10px;
+            color: #9ca3af; /* gray-400 */
+            font-weight: 500;
+            margin-left: 8px;
+            max-width: 100px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* フッター最小化時 */
+        #prompt-footer.minimized #prompt-input-area,
+        #prompt-footer.minimized #options-toolbar,
+        #prompt-footer.minimized #styles-toggle-area,
+        #prompt-footer.minimized #prompt-suggestions-container {
+            display: none;
+        }
+        /* ★★★ 追加ここまで ★★★ */
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen w-screen flex">
 
-    <!-- (省略: v12と同じSVGアイコン) -->
+    <!-- SVG アイコン -->
     <svg width="0" height="0" class="hidden">
+        <!-- (v13と同じアイコン) -->
         <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></symbol>
         <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></symbol>
         <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-translate"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></symbol>
@@ -171,25 +165,25 @@
         <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-eye"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
         <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-eye-off"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></symbol>
         <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-trash"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></symbol>
-        <!-- ★★★ 追加 (v13) ★★★ -->
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-cloud-lightning">
-            <path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"></path><polyline points="13 11 9 17 15 17 11 23"></polyline>
-        </symbol>
-        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-clock">
-            <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
-        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-cloud-lightning"><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"></path><polyline points="13 11 9 17 15 17 11 23"></polyline></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></symbol>
+        
+        <!-- ★★★ 追加 (v14) ★★★ -->
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-chevrons-down"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-chevrons-up"><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-x-octagon"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></symbol>
         <!-- ★★★ 追加ここまで ★★★ -->
     </svg>
 
-    <!-- (省略: v12と同じサイドバーHTML) -->
+    <!-- (v13と同じサイドバーHTML) -->
     <aside id="sidebar" class="bg-gray-800 h-screen w-64 p-4 flex flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
+        <!-- ... (v13のまま) ... -->
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-xl font-bold text-white">muGen History</h1>
             <button id="close-sidebar" class="md:hidden text-gray-400 hover:text-white">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
             </button>
         </div>
-        
         <div id="history-stats" class="mb-4 p-3 bg-gray-700 rounded-lg">
             <div class="flex justify-between text-sm">
                 <span class="text-gray-300">Total Images:</span>
@@ -204,14 +198,12 @@
                 <span id="stats-cost-jpy" class="font-medium text-white">¥0</span>
             </div>
         </div>
-
         <div class="mt-4 pt-4 border-t border-gray-700">
             <button id="clear-history-button" class="w-full flex items-center justify-center gap-2 bg-red-800/50 hover:bg-red-700 text-red-200 py-2 px-4 rounded-lg transition" data-tooltip="Clear local history (requires password)">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-trash"></use></svg>
                 <span>Clear History</span>
             </button>
         </div>
-
         <div id="history-container" class="flex-1 overflow-y-auto sidebar-scroll space-y-2 mt-4">
             <p class="text-gray-400 text-sm">No generated images yet.</p>
         </div>
@@ -219,8 +211,9 @@
 
     <main id="main-content" class="flex-1 flex flex-col transition-all duration-300 ease-in-out md:ml-64 min-h-screen">
         
-        <!-- (省略: v12と同じヘッダーHTML) -->
+        <!-- (v13と同じヘッダーHTML) -->
         <header class="flex-shrink-0 bg-gray-900/70 backdrop-blur-sm h-16 flex items-center px-6 shadow-md z-20">
+            <!-- ... (v13のまま) ... -->
             <button id="sidebar-toggle-button" class="text-gray-400 hover:text-white mr-4" data-tooltip="Toggle History">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-menu"></use></svg>
             </button>
@@ -235,14 +228,14 @@
             </div>
         </header>
 
-        <!-- (省略: v12と同じ画像コンテナHTML) -->
+        <!-- (v13と同じ画像コンテナHTML) -->
         <div id="image-container" class="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-hidden">
             <div id="image-display" class="w-full h-full flex items-center justify-center bg-gray-800 rounded-lg shadow-inner relative border-2 border-transparent transition-all overflow-auto p-4"> 
                 <div id="image-grid-container" class="w-full h-full grid gap-4">
                     <!-- (画像カードはJSによってここに追加されます) -->
                 </div>
-        
                 <div id="placeholder" class="text-gray-500 flex-col items-center justify-center p-8 text-center absolute inset-0 flex"> 
+                    <!-- ... (v13のまま) ... -->
                     <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>
                     <p class="mt-2">Your generated image(s) will appear here</p>
                     <p class="text-sm mt-4">or</p>
@@ -253,8 +246,8 @@
                     <input type="file" id="upload-image-input" class="hidden" accept="image/png, image/jpeg, image/webp">
                     <p class="text-xs text-gray-600 mt-2">You can also drag & drop an image here</p>
                 </div>
-
                 <div id="loading-animation" class="noise-container">
+                    <!-- ... (v13のまま) ... -->
                     <div class="absolute inset-0 flex items-center justify-center">
                         <svg class="w-12 h-12 text-indigo-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-loader"></use></svg>
                     </div>
@@ -265,22 +258,50 @@
         <footer id="prompt-footer" class="p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm z-10 fixed bottom-0 w-full md:left-64 transition-all duration-300 ease-in-out">
             <form id="generation-form" class="max-w-4xl mx-auto">
                 
-                <div class="flex flex-wrap gap-4 mb-4" id="options-toolbar">
+                <!-- ★★★ 追加 (v14): 最小化・全消去ボタン ★★★ -->
+                <div class="flex justify-between items-center mb-2">
+                    <button id="minimize-footer-button" type="button" class="text-gray-400 hover:text-white p-2 rounded-lg bg-gray-700/50 hover:bg-gray-600 transition" data-tooltip="Minimize Options">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-chevrons-down"></use></svg>
+                    </button>
+                    <button id="clear-grid-button" type="button" class="text-red-400 hover:text-red-300 p-2 rounded-lg bg-red-900/50 hover:bg-red-800 transition flex items-center gap-1.5" data-tooltip="Clear All Images">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x-octagon"></use></svg>
+                        <span class="text-xs font-medium">Clear Grid</span>
+                    </button>
+                </div>
+                <!-- ★★★ 追加ここまで ★★★ -->
+                
+                <!-- ★★★ 変更 (v14): ツールバーのHTML構造変更 ★★★ -->
+                <div class="flex flex-wrap md:flex-nowrap gap-4 mb-4" id="options-toolbar">
                     
-                    <!-- (省略: v12と同じモデル選択) -->
+                    <!-- (v13と同じ) Imagenモデル選択 -->
                     <div id="model-select-group" class="w-full md:w-auto relative">
                         <button type="button" id="models-toggle" class="flex justify-between items-center w-full p-2.5 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-600 transition">
-                            <label class="block text-sm font-medium text-white cursor-pointer">Models (Multiple)</label>
-                            <svg id="models-chevron" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <label class="block text-sm font-medium text-white cursor-pointer">Models</label>
+                            <span id="models-preview" class="accordion-preview"></span>
+                            <svg id="models-chevron" class="w-5 h-5 text-gray-400 transition-transform ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <use href="#icon-chevron-down"></use>
                             </svg>
                         </button>
-                        <div id="models-container" class="hidden max-h-48 overflow-y-auto flex flex-col gap-1 p-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700 rounded-lg mt-1">
+                        <div id="models-container" class="hidden absolute bottom-full mb-1 w-full max-h-48 overflow-y-auto flex flex-col gap-1 p-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700 rounded-lg">
                             <!-- JSで挿入 -->
                         </div>
                     </div>
                     
-                    <!-- (省略: v12と同じアスペクト比) -->
+                    <!-- ★★★ 追加 (v14): Editモデル選択 (アコーディオン) ★★★ -->
+                    <div id="edit-model-select-group" class="w-full md:w-auto relative hidden">
+                        <button type="button" id="edit-models-toggle" class="flex justify-between items-center w-full p-2.5 rounded-lg bg-blue-800 border border-blue-600 hover:bg-blue-700 transition">
+                            <label class="block text-sm font-medium text-white cursor-pointer">Edit Models</label>
+                            <span id="edit-models-preview" class="accordion-preview"></span>
+                            <svg id="edit-models-chevron" class="w-5 h-5 text-gray-400 transition-transform ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <use href="#icon-chevron-down"></use>
+                            </svg>
+                        </button>
+                        <div id="edit-models-container" class="hidden absolute bottom-full mb-1 w-full max-h-48 overflow-y-auto flex flex-col gap-1 p-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700 rounded-lg">
+                            <!-- JSで挿入 -->
+                        </div>
+                    </div>
+
+                    <!-- (v13と同じ) アスペクト比 -->
                     <div id="aspect-ratio-group">
                         <label for="aspect-ratio-select" class="block text-sm font-medium text-gray-300 mb-1">Aspect Ratio</label>
                         <select id="aspect-ratio-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
@@ -292,7 +313,7 @@
                         </select>
                     </div>
                     
-                    <!-- ★★★ 変更 (v13): ラベル変更 ★★★ -->
+                    <!-- (v13と同じ) Auto Retry -->
                     <div id="auto-retry-group">
                         <label for="auto-retry-select" class="block text-sm font-medium text-gray-300 mb-1">Auto Retry (FG)</label>
                         <select id="auto-retry-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5">
@@ -304,49 +325,49 @@
                         </select>
                     </div>
                     
-                    <div id="edit-with-flash-group" class="flex items-end gap-2">
-                        <!-- (省略: v12と同じ Editボタン) -->
-                        <button type="button" id="edit-with-flash-button" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition flex items-center gap-2" data-tooltip="Switch to Edit Mode with Gemini 2.5 Flash">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
-                            Edit with 2.5 flash
+                    <!-- ★★★ 変更 (v14): Modeアコーディオン (Private + BG) ★★★ -->
+                    <div id="mode-options-group" class="w-full md:w-auto relative">
+                        <button type="button" id="mode-options-toggle" class="flex justify-between items-center w-full p-2.5 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-600 transition">
+                            <label class="block text-sm font-medium text-white cursor-pointer">Modes</label>
+                            <span id="mode-options-preview" class="accordion-preview"></span>
+                            <svg id="mode-options-chevron" class="w-5 h-5 text-gray-400 transition-transform ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <use href="#icon-chevron-down"></use>
+                            </svg>
                         </button>
-                        <button type="button" id="edit-with-flash-2-0-button" class="bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition flex items-center gap-2" data-tooltip="Switch to Edit Mode with Gemini 2.0 Flash">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
-                            Edit with 2.0 flash
-                        </button>
-                        
-                        <!-- (省略: v12と同じ Private Mode) -->
-                        <div id="private-mode-group" class="flex items-end">
-                            <div class="relative flex items-center gap-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5 h-full">
-                                <input id="private-mode-toggle" type="checkbox" class="w-5 h-5 text-indigo-600 bg-gray-800 border-gray-600 rounded focus:ring-indigo-500">
-                                <label for="private-mode-toggle" class="cursor-pointer font-medium" data-tooltip="Blur images upon generation">
-                                    Private Mode
-                                </label>
-                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-eye-off"></use></svg>
+                        <div id="mode-options-container" class="hidden absolute bottom-full mb-1 w-full md:w-48 flex flex-col gap-1 p-2 bg-gray-900/80 backdrop-blur-sm border border-gray-700 rounded-lg">
+                            <!-- Private Mode -->
+                            <div id="private-mode-group" class="flex items-center">
+                                <div class="relative flex items-center gap-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5 h-full w-full">
+                                    <input id="private-mode-toggle" type="checkbox" class="w-5 h-5 text-indigo-600 bg-gray-800 border-gray-600 rounded focus:ring-indigo-500">
+                                    <label for="private-mode-toggle" class="cursor-pointer font-medium" data-tooltip="Blur images upon generation">
+                                        Private Mode
+                                    </label>
+                                    <svg class="w-5 h-5 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-eye-off"></use></svg>
+                                </div>
+                            </div>
+                            <!-- BG Mode -->
+                            <div id="bg-mode-group" class="flex items-center">
+                                <div class="relative flex items-center gap-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5 h-full w-full">
+                                    <input id="bg-mode-toggle" type="checkbox" class="hidden toggle-bg">
+                                    <label for="bg-mode-toggle" class="relative inline-flex items-center cursor-pointer">
+                                        <span class="w-10 h-5 bg-gray-600 rounded-full shadow-inner toggle-label">
+                                            <span class="absolute left-0 w-5 h-5 bg-white border border-gray-300 rounded-full shadow-md transform" style="top: 0; left: 0;"></span>
+                                        </span>
+                                    </label>
+                                    <label for="bg-mode-toggle" class="ml-2 cursor-pointer font-medium" data-tooltip="Background Mode (Page close OK)">
+                                        BG Mode
+                                    </label>
+                                    <svg class="w-5 h-5 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-cloud-lightning"></use></svg>
+                                </div>
                             </div>
                         </div>
-                        
-                        <!-- ★★★ 追加 (v13): BGトグルスイッチ ★★★ -->
-                        <div id="bg-mode-group" class="flex items-end">
-                            <div class="relative flex items-center gap-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5 h-full">
-                                <input id="bg-mode-toggle" type="checkbox" class="hidden toggle-bg">
-                                <label for="bg-mode-toggle" class="relative inline-flex items-center cursor-pointer">
-                                    <span class="w-10 h-5 bg-gray-600 rounded-full shadow-inner toggle-label">
-                                        <span class="absolute left-0 w-5 h-5 bg-white border border-gray-300 rounded-full shadow-md transform" style="top: 0; left: 0;"></span>
-                                    </span>
-                                </label>
-                                <label for="bg-mode-toggle" class="ml-2 cursor-pointer font-medium" data-tooltip="Background Mode (Page close OK)">
-                                    BG Mode
-                                </label>
-                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-cloud-lightning"></use></svg>
-                            </div>
-                        </div>
-                        <!-- ★★★ 追加ここまで ★★★ -->
                     </div>
+                    <!-- ★★★ 変更ここまで ★★★ -->
+
                 </div>
 
-                <!-- (省略: v12と同じ Styles) -->
-                <div class="mb-4">
+                <!-- ★★★ 変更 (v14): ID追加 ★★★ -->
+                <div class="mb-4" id="styles-toggle-area">
                     <button type="button" id="styles-toggle" class="flex justify-between items-center w-full p-2 rounded-lg hover:bg-gray-700 transition">
                         <label class="block text-sm font-medium text-gray-300 cursor-pointer">Styles (Optional, multiple)</label>
                         <svg id="styles-chevron" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -361,24 +382,23 @@
                     </div>
                 </div>
 
-                <!-- (省略: v12と同じ Prompt Suggestions) -->
+                <!-- (v13と同じ) Prompt Suggestions -->
                 <div id="prompt-suggestions-container" class="hidden mb-4 p-3 bg-gray-700/50 rounded-lg max-h-48 overflow-y-auto">
+                    <!-- ... (v13のまま) ... -->
                     <p class="text-sm text-gray-300 mb-2">Multiple prompt suggestions found. Select desired prompts:</p>
-                    <div id="prompt-suggestions-list" class="space-y-2">
-                        <!-- 翻訳候補がJSによってここに追加されます -->
-                    </div>
+                    <div id="prompt-suggestions-list" class="space-y-2"></div>
                     <button type="button" id="apply-suggestions-button" class="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition">
                         Set Selected Prompts
                     </button>
                 </div>
 
-                <!-- (省略: v12と同じ Edit Mode Indicator) -->
+                <!-- (v13と同じ) Edit Mode Indicator -->
                 <div id="edit-mode-indicator" class="hidden text-center text-indigo-300 text-sm font-medium p-2 bg-indigo-900/50 rounded-lg mt-3">
                     🎨 Editing Mode - Subsequent generations will edit the current image. (Change model to Imagen 3.0 to exit)
                 </div>
 
-                <!-- (省略: v12と同じ Prompt Input) -->
-                <div class="relative mt-4">
+                <!-- ★★★ 変更 (v14): ID追加 ★★★ -->
+                <div class="relative mt-4" id="prompt-input-area">
                     <textarea id="prompt-input" rows="2" class="block w-full p-4 pr-56 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Enter your prompt... (Non-English will be translated)"></textarea>
                     
                     <div class="absolute bottom-3 right-44 flex space-x-2">
@@ -406,8 +426,9 @@
         </footer>
     </main>
 
-    <!-- (省略: v12と同じ Image Modal) -->
+    <!-- (v13と同じ Image Modal) -->
     <div id="image-modal" class="modal">
+        <!-- ... (v13のまま) ... -->
         <div class="bg-gray-800 rounded-lg shadow-xl w-11/12 max-w-6xl max-h-[95vh] flex flex-col p-4">
             <div id="modal-image-wrapper" class="flex-1 flex items-center justify-center overflow-auto bg-gray-900/50 rounded-lg min-h-[50vh] mb-4">
                 <img id="modal-image" src="" class="max-w-full max-h-full object-contain">
@@ -447,8 +468,9 @@
         </div>
     </div>
 
-    <!-- (省略: v12と同じ Toast) -->
+    <!-- (v13と同じ Toast, Auth Modal, Delete Confirm Modal) -->
     <div id="toast" class="fixed top-20 right-6 text-white py-3 px-4 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50">
+        <!-- ... (v13のまま) ... -->
         <div class="flex items-start justify-between">
             <p id="toast-message" class="flex-1 pr-4">Message</p>
             <div class="flex flex-col space-y-1">
@@ -461,9 +483,8 @@
             </div>
         </div>
     </div>
-    
-    <!-- (省略: v12と同じ Auth Modal) -->
     <div id="auth-modal" class="modal flex">
+        <!-- ... (v13のまま) ... -->
         <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
             <div class="flex items-center justify-center mb-4">
                 <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-lock"></use></svg>
@@ -479,9 +500,8 @@
             </form>
         </div>
     </div>
-
-    <!-- (省略: v12と同じ Delete Confirm Modal) -->
     <div id="delete-confirm-modal" class="modal"> 
+        <!-- ... (v13のまま) ... -->
         <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
             <div class="flex items-center justify-center mb-4">
                 <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-trash"></use></svg>
@@ -499,13 +519,14 @@
                         Delete
                     </button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 
 
     <script>
-        // --- CONSTANTS & STATE (v13) ---
+        // --- CONSTANTS & STATE (v14) ---
+        // (v13と同じ)
         const STYLES = [
             "Photorealistic", "Cinematic", "35mm film", "Black and white", "Impressionistic",
             "Surrealism", "Watercolour", "Ukiyo-e", "Cyberpunk", "Steampunk",
@@ -519,13 +540,13 @@
             "imagen-4.0-fast-generate-001": { name: "Imagen 4.0 Fast", type: "imagen" },
             "imagen-3.0-generate": { name: "Imagen 3.0", type: "imagen" },
             // Gemini (Edit)
-            "gemini-2.5-flash-image-preview": { name: "Gemini 2.5 Flash Image", type: "gemini-edit" },
-            "gemini-2.0-flash-preview-image-generation": { name: "Gemini 2.0 Flash Image", type: "gemini-edit" }
+            "gemini-2.5-flash-image-preview": { name: "Gemini 2.5 Flash", type: "gemini-edit", short: "2.5" },
+            "gemini-2.0-flash-preview-image-generation": { name: "Gemini 2.0 Flash", type: "gemini-edit", short: "2.0" }
         };
         const PRICE_IMAGEN_USD = 0.02;
         const PRICE_GEMINI_FLASH_IMAGE_USD = 0.002;
         const PRICE_GEMINI_FLASH_IMAGE_2_0_USD = 0.002;
-        const USD_JPY_RATE = 150; // 仮の為替レート
+        const USD_JPY_RATE = 150; 
 
         let db;
         let apiKeyCounter = 0; 
@@ -534,7 +555,6 @@
         let lastEnterPress = 0; 
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-        // ★★★ 変更 (v13) ★★★
         // FG (フォアグラウンド) 用の変数
         let generationInProgress_FG = false; 
         let runningGenerations_FG = new Set(); 
@@ -543,11 +563,9 @@
         // BG (バックグラウンド) 用のポーリング変数
         let isPolling_BG = false;
         let pollingIntervalId_BG = null;
-        // ★ 変更: 複数のBGジョブを同時にポーリングできるようにSetで管理
-        let pollingJobs_BG = new Set(); // { jobId, cardId, modelName } を格納
+        let pollingJobs_BG = new Set(); 
         
-        const POLLING_INTERVAL = 5000; // 5秒
-        // ★★★ 変更ここまで ★★★
+        const POLLING_INTERVAL = 5000; 
         
         let toastTimeoutId = null;
         let touchStartX = 0, touchStartY = 0, touchMoveX = 0;
@@ -555,8 +573,8 @@
         const MAX_ZOOM = 10, MIN_ZOOM = 0.5;
 
 
-        // --- DOM ELEMENTS (v13) ---
-        // (省略: v12と同じ要素)
+        // --- DOM ELEMENTS (v14) ---
+        // (v13と同じ要素)
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('main-content');
         const sidebarToggleButton = document.getElementById('sidebar-toggle-button');
@@ -598,8 +616,7 @@
         const modelSelectGroup = document.getElementById('model-select-group');
         const aspectRatioGroup = document.getElementById('aspect-ratio-group');
         const autoRetryGroup = document.getElementById('auto-retry-group');
-        const editWithFlashButton = document.getElementById('edit-with-flash-button');
-        const editWithFlash20Button = document.getElementById('edit-with-flash-2-0-button');
+        // (v13: editWithFlashButton は削除)
         const stylesToggleBtn = document.getElementById('styles-toggle');
         const stylesContainer = document.getElementById('styles-container');
         const stylesChevron = document.getElementById('styles-chevron');
@@ -627,8 +644,33 @@
         const confirmDeleteButton = document.getElementById('confirm-delete-button');
         const cancelDeleteButton = document.getElementById('cancel-delete-button');
         
-        // ★★★ 追加 (v13) ★★★
+        // (v13)
         const bgModeToggle = document.getElementById('bg-mode-toggle');
+        
+        // ★★★ 追加 (v14) ★★★
+        const minimizeFooterButton = document.getElementById('minimize-footer-button');
+        const clearGridButton = document.getElementById('clear-grid-button');
+        
+        // Imagenモデル
+        const modelsPreview = document.getElementById('models-preview');
+        
+        // Editモデル
+        const editModelSelectGroup = document.getElementById('edit-model-select-group');
+        const editModelsToggleBtn = document.getElementById('edit-models-toggle');
+        const editModelsContainer = document.getElementById('edit-models-container');
+        const editModelsChevron = document.getElementById('edit-models-chevron');
+        const editModelsPreview = document.getElementById('edit-models-preview');
+        
+        // Mode (Private/BG)
+        const modeOptionsToggleBtn = document.getElementById('mode-options-toggle');
+        const modeOptionsContainer = document.getElementById('mode-options-container');
+        const modeOptionsChevron = document.getElementById('mode-options-chevron');
+        const modeOptionsPreview = document.getElementById('mode-options-preview');
+        const privateModeToggle = document.getElementById('private-mode-toggle');
+        
+        // フッターエリア
+        const promptInputArea = document.getElementById('prompt-input-area');
+        const stylesToggleArea = document.getElementById('styles-toggle-area');
         // ★★★ 追加ここまで ★★★
 
 
@@ -638,19 +680,20 @@
             initDB();
             initSidebar();
             initStyles();
-            initModels();
-            initListeners(); // ★ 変更あり
+            initModels(); // ★ v14: 修正あり (Editモデル除外)
+            initEditModels(); // ★ v14: 新規追加
+            initListeners(); // ★ v14: 修正あり
             loadHistory();
             adjustMainContentPadding();
             updatePlaceholderVisibility();
             updateSelectedStylesPreview(false);
             
-            // ★ v13: 初期UI状態を設定
+            // ★ v14: 初期UI状態を設定
             handleBGModeToggle(); 
+            updateModeOptionsPreview(); // ★ v14: 新規追加
         });
 
-        // --- ★ v13: AUTHENTICATION ---
-        // (省略: v12と同じ checkAuth, handleAuthSubmit 関数)
+        // --- (v13と同じ Auth functions) ---
         function checkAuth() {
             if (sessionStorage.getItem('muGenAuthenticated') === 'true') {
                 authModal.classList.remove('flex');
@@ -689,8 +732,7 @@
         }
 
 
-        // --- ★ v13: CUSTOM STYLE FUNCTIONS ---
-        // (省略: v12と同じ getCustomStyles, saveCustomStyles, handleAddCustomStyle, handleRemoveCustomStyle 関数)
+        // --- (v13と同じ Custom Style functions) ---
         function getCustomStyles() {
             try {
                 const styles = localStorage.getItem(CUSTOM_STYLES_KEY);
@@ -726,8 +768,7 @@
         }
 
 
-        // --- ★ v13: IndexedDB functions ---
-        // (省略: v12と同じ initDB, saveImageToDB, loadHistory, clearOldHistory, handleClearHistory 関数)
+        // --- (v13と同じ IndexedDB functions) ---
         function initDB() {
             const request = indexedDB.open("muGenDB", 1);
             request.onerror = (event) => { console.error("IndexedDB error:", event.target.errorCode); showToast("Database error. History may not work.", "error"); };
@@ -800,10 +841,12 @@
                             const base64 = e.currentTarget.dataset.base64;
                             const prompt = e.currentTarget.dataset.prompt;
                             loadUploadedImage(`data:image/png;base64,${base64}`, prompt, false);
-                            toggleEditMode(true, ['gemini-2.5-flash-image-preview']);
+                            // ★ v14: toggleEditMode の引数変更
+                            toggleEditMode(true); 
                         });
                         historyContainer.appendChild(div);
 
+                        // (v13と同じコスト計算)
                         if (item.model === 'imagen-3.0-generate' || 
                             item.model === 'imagen-4.0-generate-preview-06-06' || 
                             item.model === 'imagen-4.0-ultra-generate-preview-06-06' ||
@@ -868,8 +911,7 @@
             }
         }
 
-        // --- ★ v13: UI INITIALIZATION ---
-        // (省略: v12と同じ initSidebar, toggleSidebar 関数)
+        // --- (v13と同じ UI Init: Sidebar) ---
         function initSidebar() {
             sidebarToggleButton.addEventListener('click', toggleSidebar);
             closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
@@ -893,7 +935,7 @@
             }
         }
         
-        // (省略: v12と同じ initStyles 関数)
+        // --- (v13と同じ UI Init: Styles) ---
         function initStyles() {
             const container = document.getElementById('styles-container');
             container.innerHTML = ""; 
@@ -940,8 +982,8 @@
             container.appendChild(addBtnContainer);
         }
 
-        // --- EVENT LISTENERS (v13) ---
-        // ★★★ 変更 (v13) ★★★
+        // --- EVENT LISTENERS (v14) ---
+        // ★★★ 変更 (v14): リスナー追加 ★★★
         function initListeners() {
             // 認証
             authForm.addEventListener('submit', handleAuthSubmit);
@@ -957,7 +999,11 @@
                 deleteConfirmModal.classList.remove('flex');
             });
 
-            // ★ 変更: フォームの送信先を handleGenerationSubmit (ルーター) に
+            // ★ v14: フッター操作
+            minimizeFooterButton.addEventListener('click', handleToggleFooter);
+            clearGridButton.addEventListener('click', handleClearGrid);
+
+            // フォーム送信
             generationForm.addEventListener('submit', handleGenerationSubmit); 
             
             // 翻訳
@@ -971,9 +1017,20 @@
             // 翻訳候補
             applySuggestionsButton.addEventListener('click', handleApplySuggestions);
             
-            // モデル選択
+            // ★ v14: モデル選択 (Imagen)
             modelsToggleBtn.addEventListener('click', () => toggleModelsAccordion());
             
+            // ★ v14: モデル選択 (Edit)
+            editModelsToggleBtn.addEventListener('click', () => toggleEditModelsAccordion());
+
+            // ★ v14: Mode選択 (Private/BG)
+            modeOptionsToggleBtn.addEventListener('click', () => toggleModeOptionsAccordion());
+            privateModeToggle.addEventListener('change', updateModeOptionsPreview);
+            bgModeToggle.addEventListener('change', () => {
+                handleBGModeToggle(); // 既存の処理
+                updateModeOptionsPreview(); // ★ v14: プレビュー更新
+            });
+
             // 画像モーダル
             modalClose.addEventListener('click', () => imageModal.classList.remove('flex'));
             modalCopy.addEventListener('click', handleModalCopy);
@@ -983,9 +1040,7 @@
             modalZoomOut.addEventListener('click', handleZoomOut);
             modalZoomReset.addEventListener('click', handleZoomReset);
 
-            // 編集モードボタン
-            editWithFlashButton.addEventListener('click', () => toggleEditMode(true, ['gemini-2.5-flash-image-preview']));
-            editWithFlash20Button.addEventListener('click', () => toggleEditMode(true, ['gemini-2.0-flash-preview-image-generation']));
+            // (v13: editWithFlashButton は削除)
             
             // トースト
             toastClose.addEventListener('click', () => hideToast());
@@ -1022,23 +1077,24 @@
             document.addEventListener('touchmove', handleTouchMove, { passive: true });
             document.addEventListener('touchend', handleTouchEnd, { passive: true });
 
-            // ★ 追加 (v13): BGトグルのリスナー
-            bgModeToggle.addEventListener('change', handleBGModeToggle);
+            // (v13: bgModeToggle のリスナーは上で統合)
         }
         // ★★★ 変更ここまで ★★★
         
-        // (省略: v12と同じ adjustMainContentPadding, handleTouchStart, handleTouchMove, handleTouchEnd 関数)
+        // (v13と同じ)
         function adjustMainContentPadding() {
             if (promptFooter && imageContainer) {
                 const footerHeight = promptFooter.offsetHeight;
                 imageContainer.style.paddingBottom = `${footerHeight + 20}px`;
             }
         }
+        // (v13と同じ)
         function handleTouchStart(event) {
             if (authModal.classList.contains('flex') || deleteConfirmModal.classList.contains('flex')) return;
             const firstTouch = event.touches[0];
             touchStartX = firstTouch.clientX; touchStartY = firstTouch.clientY; touchMoveX = firstTouch.clientX;
         }
+        // (v13と同じ)
         function handleTouchMove(event) {
             if (authModal.classList.contains('flex') || deleteConfirmModal.classList.contains('flex')) return;
             if (Math.abs(event.touches[0].clientX - touchStartX) < Math.abs(event.touches[0].clientY - touchStartY)) {
@@ -1046,6 +1102,7 @@
             }
             touchMoveX = event.touches[0].clientX;
         }
+        // (v13と同じ)
         function handleTouchEnd() {
             if (authModal.classList.contains('flex') || deleteConfirmModal.classList.contains('flex')) return;
             if (touchStartX === 0) return; 
@@ -1058,8 +1115,7 @@
             }
             touchStartX = 0; touchStartY = 0; touchMoveX = 0;
         }
-        
-        // (省略: v12と同じ handleAutoRetryChange 関数)
+        // (v13と同じ)
         function handleAutoRetryChange() {
             if(autoRetrySelect.value === '-1') {
                 const customRetry = prompt("Enter number of retries:", "100");
@@ -1074,20 +1130,19 @@
         }
 
 
-        // --- CORE LOGIC (v13) ---
+        // --- CORE LOGIC (v14) ---
 
-        // (省略: v12と同じ initModels, toggleModelsAccordion, handleModelSelectionChange 関数)
+        // ★★★ 変更 (v14): Imagenモデルのみ初期化、デフォルトチェック削除 ★★★
         function initModels() {
             modelsContainer.innerHTML = "";
             for (const [modelId, modelInfo] of Object.entries(MODELS)) {
+                // 'imagen' タイプのモデルのみをメインコンテナに追加
+                if (modelInfo.type !== 'imagen') continue; 
+                
                 const inputId = `model-${modelId}`;
                 let labelClass = "cursor-pointer text-gray-300 hover:bg-gray-700 p-2 rounded-md flex items-center border border-transparent";
-                let modelTypeIcon = "";
-                if (modelInfo.type === 'imagen') {
-                    modelTypeIcon = `<svg class="w-4 h-4 mr-2 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>`;
-                } else if (modelInfo.type === 'gemini-edit') {
-                    modelTypeIcon = `<svg class="w-4 h-4 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>`;
-                }
+                let modelTypeIcon = `<svg class="w-4 h-4 mr-2 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>`;
+
                 const div = document.createElement('div');
                 div.innerHTML = `
                     <input type="checkbox" id="${inputId}" value="${modelId}" data-type="${modelInfo.type}" class="hidden model-checkbox">
@@ -1099,19 +1154,54 @@
                 modelsContainer.appendChild(div);
                 div.querySelector('input').addEventListener('change', handleModelSelectionChange);
             }
-            const defaultModel = document.getElementById('model-imagen-4.0-fast-generate-001');
-            if (defaultModel) {
-                defaultModel.checked = true;
-            } else if (document.getElementById('model-imagen-3.0-generate')) {
-                document.getElementById('model-imagen-3.0-generate').checked = true; // フォールバック
-            }
+            
+            // ★ v14: デフォルト選択を削除
+            // const defaultModel = document.getElementById('model-imagen-4.0-fast-generate-001');
+            // if (defaultModel) {
+            //     defaultModel.checked = true;
+            // } ... (削除)
+
             document.addEventListener('click', (e) => {
                 if (!modelSelectGroup.contains(e.target) && !modelsContainer.classList.contains('hidden')) {
                     toggleModelsAccordion(false);
                 }
             });
             updateToolbarForSelection();
+            updateModelsPreview(); // ★ v14: プレビュー更新
         }
+        
+        // ★★★ 新規 (v14): Editモデルを初期化 ★★★
+        function initEditModels() {
+            editModelsContainer.innerHTML = "";
+            for (const [modelId, modelInfo] of Object.entries(MODELS)) {
+                // 'gemini-edit' タイプのモデルのみをEditコンテナに追加
+                if (modelInfo.type !== 'gemini-edit') continue; 
+                
+                const inputId = `edit-model-${modelId}`;
+                let labelClass = "cursor-pointer text-gray-300 hover:bg-gray-700 p-2 rounded-md flex items-center border border-transparent";
+                let modelTypeIcon = `<svg class="w-4 h-4 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>`;
+
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <input type="checkbox" id="${inputId}" value="${modelId}" data-type="${modelInfo.type}" class="hidden edit-model-checkbox">
+                    <label for="${inputId}" class="${labelClass}">
+                        ${modelTypeIcon}
+                        ${modelInfo.name}
+                    </label>
+                `;
+                editModelsContainer.appendChild(div);
+                div.querySelector('input').addEventListener('change', handleEditModelSelectionChange);
+            }
+            
+            document.addEventListener('click', (e) => {
+                if (!editModelSelectGroup.contains(e.target) && !editModelsContainer.classList.contains('hidden')) {
+                    toggleEditModelsAccordion(false);
+                }
+            });
+            updateEditModelsPreview(); // プレビュー更新
+        }
+
+        // (v13と同じ)
         function toggleModelsAccordion(forceOpen) {
             const isOpen = !modelsContainer.classList.contains('hidden');
             let shouldBeOpen;
@@ -1124,22 +1214,123 @@
             } else {
                 modelsContainer.classList.add('hidden');
                 modelsChevron.classList.remove('rotate-180');
+                updateModelsPreview(); // ★ v14: 閉じたときにプレビュー更新
             }
             setTimeout(adjustMainContentPadding, 100); 
         }
+        
+        // ★★★ 新規 (v14): Editモデルアコーディオン ★★★
+        function toggleEditModelsAccordion(forceOpen) {
+            const isOpen = !editModelsContainer.classList.contains('hidden');
+            let shouldBeOpen;
+            if (forceOpen === true) shouldBeOpen = true;
+            else if (forceOpen === false) shouldBeOpen = false;
+            else shouldBeOpen = !isOpen;
+            if (shouldBeOpen) {
+                editModelsContainer.classList.remove('hidden');
+                editModelsChevron.classList.add('rotate-180');
+            } else {
+                editModelsContainer.classList.add('hidden');
+                editModelsChevron.classList.remove('rotate-180');
+                updateEditModelsPreview(); // 閉じたときにプレビュー更新
+            }
+            setTimeout(adjustMainContentPadding, 100); 
+        }
+
+        // ★★★ 新規 (v14): Modeアコーディオン ★★★
+        function toggleModeOptionsAccordion(forceOpen) {
+            const isOpen = !modeOptionsContainer.classList.contains('hidden');
+            let shouldBeOpen;
+            if (forceOpen === true) shouldBeOpen = true;
+            else if (forceOpen === false) shouldBeOpen = false;
+            else shouldBeOpen = !isOpen;
+            if (shouldBeOpen) {
+                modeOptionsContainer.classList.remove('hidden');
+                modeOptionsChevron.classList.add('rotate-180');
+            } else {
+                modeOptionsContainer.classList.add('hidden');
+                modeOptionsChevron.classList.remove('rotate-180');
+                updateModeOptionsPreview(); // 閉じたときにプレビュー更新
+            }
+            setTimeout(adjustMainContentPadding, 100); 
+        }
+
+        // ★★★ 新規 (v14): Imagenモデルプレビュー更新 ★★★
+        function updateModelsPreview() {
+            const selected = Array.from(document.querySelectorAll('.model-checkbox:checked'))
+                                .map(cb => MODELS[cb.value]?.name || 'Unknown');
+            if (selected.length === 0) {
+                modelsPreview.textContent = "(None)";
+            } else if (selected.length === 1) {
+                modelsPreview.textContent = selected[0];
+            } else {
+                modelsPreview.textContent = `${selected.length} Selected`;
+            }
+        }
+        
+        // ★★★ 新規 (v14): Editモデルプレビュー更新 ★★★
+        function updateEditModelsPreview() {
+            const selected = Array.from(document.querySelectorAll('.edit-model-checkbox:checked'))
+                                .map(cb => MODELS[cb.value]?.short || 'N/A');
+            if (selected.length === 0) {
+                editModelsPreview.textContent = "(None)";
+            } else {
+                editModelsPreview.textContent = selected.join(', ');
+            }
+        }
+        
+        // ★★★ 新規 (v14): Modeプレビュー更新 ★★★
+        function updateModeOptionsPreview() {
+            const isPrivate = privateModeToggle.checked;
+            const isBG = bgModeToggle.checked;
+            let previewText = [];
+            if (isPrivate) previewText.push("Private");
+            if (isBG) previewText.push("BG");
+            
+            if (previewText.length === 0) {
+                modeOptionsPreview.textContent = "(Off)";
+            } else {
+                modeOptionsPreview.textContent = previewText.join(' + ');
+            }
+        }
+
+        // (v13と同じ)
         function handleModelSelectionChange() {
+            // ★ v14: プレビュー更新
+            if (!modelsContainer.classList.contains('hidden')) {
+                updateModelsPreview();
+            }
+            // (v13: toggleEditMode(false) は削除)
+            
             if (!isEditingMode) {
                 updateToolbarForSelection();
             }
         }
         
-        // ★★★ 変更 (v13): BGトグルに応じてUI制御 ★★★
-        /**
-         * 選択中のモデルとBGモードに応じてツールバーを制御
-         */
+        // ★★★ 新規 (v14): Editモデル選択時の処理 ★★★
+        function handleEditModelSelectionChange() {
+            // プレビュー更新
+            if (!editModelsContainer.classList.contains('hidden')) {
+                updateEditModelsPreview();
+            }
+            
+            // Editモデルが1つでも選択されたら、自動でEdit ModeをONにする
+            const selectedEditModels = getSelectedModels();
+            if (selectedEditModels.length > 0 && !isEditingMode) {
+                toggleEditMode(true);
+            }
+            // Editモデルが0になったら、自動でEdit ModeをOFFにする
+            else if (selectedEditModels.length === 0 && isEditingMode) {
+                toggleEditMode(false);
+            }
+        }
+        
+        // (v13と同じ)
         function updateToolbarForSelection() {
-            const selectedModels = getSelectedModels();
-            const hasImagen = selectedModels.some(modelId => MODELS[modelId]?.type === 'imagen');
+            const selectedModels = getSelectedModels(); // ★ v14: getSelectedModels() は修正済み
+            
+            // isEditingMode は getSelectedModels の結果に依存しない (toggleEditMode で制御)
+            const hasImagen = selectedModels.some(modelId => MODELS[modelId]?.type === 'imagen') && !isEditingMode;
             const isBGMode = bgModeToggle.checked;
 
             // 1. Imagen系 (Aspect Ratio, Styles)
@@ -1161,22 +1352,24 @@
             setTimeout(adjustMainContentPadding, 100);
         }
         
-        /**
-         * ★ 新規 (v13): BGトグルが変更されたときの処理
-         */
+        // (v13と同じ)
         function handleBGModeToggle() {
-            // トグル状態に応じてツールバーを更新
             updateToolbarForSelection();
-            
-            // アイコンを更新 (BGモードでも編集モードはわかるように)
             setLoading(generateButton, false); 
         }
-        // ★★★ 変更ここまで ★★★
         
-        // (省略: v12と同じ getSelectedModels, updateGridColumns, updatePlaceholderVisibility 関数)
+        // ★★★ 変更 (v14): 選択中のモデル取得ロジック変更 ★★★
         function getSelectedModels() {
-             return Array.from(document.querySelectorAll('.model-checkbox:checked')).map(cb => cb.value);
+             if (isEditingMode) {
+                // 編集モードの時は、Editモデルのチェックボックスから取得
+                return Array.from(document.querySelectorAll('.edit-model-checkbox:checked')).map(cb => cb.value);
+             } else {
+                // 通常モードの時は、Imagenモデルのチェックボックスから取得
+                return Array.from(document.querySelectorAll('.model-checkbox:checked')).map(cb => cb.value);
+             }
         }
+
+        // (v13と同じ)
         function updateGridColumns() {
             const count = imageGridContainer.children.length;
             imageGridContainer.classList.remove('grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3');
@@ -1188,6 +1381,7 @@
                 imageGridContainer.classList.add('grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3');
             }
         }
+        // (v13と同じ)
         function updatePlaceholderVisibility() {
             if (imageGridContainer.children.length > 0) {
                 placeholder.style.display = 'none';
@@ -1196,13 +1390,14 @@
             }
         }
 
-        // (省略: v12と同じ toggleStylesAccordion, updateSelectedStylesPreview 関数)
+        // (v13と同じ)
         function toggleStylesAccordion() {
             const isClosing = stylesContainer.classList.toggle('hidden'); 
             stylesChevron.classList.toggle('rotate-180');
             updateSelectedStylesPreview(isClosing);
             setTimeout(adjustMainContentPadding, 100);
         }
+        // (v13と同じ)
         function updateSelectedStylesPreview(showPreview = false) {
             if (!showPreview) {
                 selectedStylesPreview.classList.add('hidden');
@@ -1220,7 +1415,7 @@
             }
         }
 
-        // (省略: v12と同じ handlePromptKeydown 関数)
+        // (v13と同じ)
         function handlePromptKeydown(event) {
             if (isMobile) {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -1245,75 +1440,70 @@
             }
         }
 
-        // (省略: v12と同じ clearImageGrid 関数)
-        function clearImageGrid() {
+        // ★★★ 変更 (v14): 全消去ボタン用 (名前を handleClearGrid に変更) ★★★
+        function handleClearGrid() {
             imageGridContainer.innerHTML = '';
             currentEditImageBase64 = null;
             if (isEditingMode) {
-                toggleEditMode(false);
+                toggleEditMode(false); // Editモードも解除
             }
             updatePlaceholderVisibility();
             updateGridColumns();
         }
 
-        // (省略: v12と同じ toggleEditMode 関数)
-        function toggleEditMode(forceOn, modelsToSelect = []) { 
+        // ★★★ 変更 (v14): toggleEditMode のロジック大幅変更 ★★★
+        function toggleEditMode(forceOn) { 
             isEditingMode = forceOn;
-            const allModelCheckboxes = Array.from(document.querySelectorAll('.model-checkbox'));
+            
             if (isEditingMode) {
                 if (!currentEditImageBase64) {
                     showToast("No image to edit. Generate or upload an image first.", "warning");
                     isEditingMode = false;
                     return;
                 }
-                promptInput.placeholder = "Enter edit instructions...";
-                optionsToolbar.style.display = 'flex';
-                modelsToggleBtn.style.display = 'block';
-                // autoRetryGroup は handleBGModeToggle で制御
-                aspectRatioGroup.style.display = 'none';
-                stylesToggleBtn.style.display = 'none';
                 
-                allModelCheckboxes.forEach(cb => {
-                    const modelType = cb.dataset.type;
-                    if (modelType === 'gemini-edit') {
-                        cb.parentElement.style.display = 'block';
-                        cb.checked = modelsToSelect.includes(cb.value);
-                    } else {
-                        cb.parentElement.style.display = 'none';
-                        cb.checked = false;
-                    }
-                });
+                // --- Edit モード ON ---
+                promptInput.placeholder = "Enter edit instructions...";
+                
+                // Imagenモデルを隠し、Editモデルを表示
+                modelSelectGroup.style.display = 'none';
+                editModelSelectGroup.style.display = 'block';
+                
+                // (Aspect/Styles/AutoRetryは updateToolbarForSelection で制御)
+                
+                // Imagenモデルの選択を解除
+                Array.from(document.querySelectorAll('.model-checkbox')).forEach(cb => cb.checked = false);
+                updateModelsPreview(); // (None) にする
+
                 imageDisplay.classList.add('ring-4', 'ring-indigo-500');
                 if (!stylesContainer.classList.contains('hidden')) { toggleStylesAccordion(); }
-                editModeIndicator.textContent = `🎨 Editing Mode (Gemini 2.0 / 2.5) - Select models to use for editing.`;
+                
+                editModeIndicator.textContent = `🎨 Editing Mode - Select Edit Models (2.0/2.5) to use.`;
                 editModeIndicator.classList.remove('hidden');
+                
             } else {
+                // --- Edit モード OFF ---
                 promptInput.placeholder = "Enter your prompt... (Non-English will be translated)";
-                optionsToolbar.style.display = 'flex';
-                modelsToggleBtn.style.display = 'block';
-                // autoRetryGroup は handleBGModeToggle で制御
 
-                let defaultModelChecked = false;
-                allModelCheckboxes.forEach(cb => {
-                    cb.parentElement.style.display = 'block';
-                    if (cb.value === 'imagen-4.0-fast-generate-001') {
-                         cb.checked = true; defaultModelChecked = true;
-                    } else {
-                         cb.checked = false;
-                    }
-                });
-                if (!defaultModelChecked && document.getElementById('model-imagen-3.0-generate')) {
-                     document.getElementById('model-imagen-3.0-generate').checked = true;
-                }
+                // Editモデルを隠し、Imagenモデルを表示
+                modelSelectGroup.style.display = 'block';
+                editModelSelectGroup.style.display = 'none';
+
+                // Editモデルの選択を解除
+                Array.from(document.querySelectorAll('.edit-model-checkbox')).forEach(cb => cb.checked = false);
+                updateEditModelsPreview(); // (None) にする
+
                 imageDisplay.classList.remove('ring-4', 'ring-indigo-500');
                 editModeIndicator.classList.add('hidden');
             }
+            
+            // ツールバー（Aspect/Styles/Retry）の表示を更新
             updateToolbarForSelection();
-            setLoading(generateButton, false);
+            setLoading(generateButton, false); // ボタンアイコンを更新
             setTimeout(adjustMainContentPadding, 100);
         }
 
-        // (省略: v12と同じ handleTranslate, handleApplySuggestions, escapeHTML 関数)
+        // (v13と同じ)
         async function handleTranslate() {
             const prompt = promptInput.value;
             if (!prompt) { showToast("Please enter text to translate", "warning"); return; }
@@ -1330,7 +1520,7 @@
                     body: JSON.stringify({
                         action: 'translate',
                         prompt: prompt,
-                        keyIndex: apiKeyCounter // ★ v13: キーインデックスを渡す
+                        keyIndex: apiKeyCounter
                     })
                 }, 0, controller.signal);
                 clearTimeout(timeoutId);
@@ -1376,6 +1566,7 @@
                 setTimeout(adjustMainContentPadding, 100);
             }
         }
+        // (v13と同じ)
         function handleApplySuggestions() {
             const selectedCandidates = Array.from(document.querySelectorAll('.suggestion-checkbox:checked'));
             const combinedPrompt = selectedCandidates.map(cb => cb.value).join(', ');
@@ -1385,6 +1576,7 @@
             promptSuggestionsList.innerHTML = '';
             setTimeout(adjustMainContentPadding, 100);
         }
+        // (v13と同じ)
         function escapeHTML(str) {
             if (typeof str !== 'string') return '';
             return str.replace(/[&<>"']/g, function(match) {
@@ -1393,28 +1585,22 @@
         }
 
 
-        // ★★★ 変更 (v13): 生成処理のルーター ★★★
-        /**
-         * 生成ボタン押下時のメインルーター (v13)
-         * FG/BGモードを判定し、それぞれの処理を呼び出す
-         */
+        // ★★★ 変更 (v14): フォーム送信ハンドラ (getSelectedModels が修正されたためロジックはほぼv13のまま) ★★★
         function handleGenerationSubmit(event) {
             if (event) event.preventDefault();
             
             const isBGMode = bgModeToggle.checked;
             
             // --- キャンセル処理 ---
-            // FGモードで実行中か、BGモードでポーリング中なら、キャンセル
             if (generationInProgress_FG || isPolling_BG) {
                 if (generationInProgress_FG && currentFetchController_FG) {
-                    currentFetchController_FG.abort(); // FGのFetchをキャンセル
+                    currentFetchController_FG.abort(); 
                     showToast("FG generations cancelled", "info");
                 }
                 if (isPolling_BG) {
-                    stopPolling_BG(true); // BGのポーリングをキャンセル
+                    stopPolling_BG(true); 
                     showToast("BG generation polling cancelled", "info");
                 }
-                // setLoading(false) は各処理の finally で呼ばれる
                 return;
             }
             
@@ -1429,7 +1615,8 @@
             const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked')).map(cb => cb.value);
             let finalPrompt = prompt;
 
-            const selectedModels = getSelectedModels();
+            // ★ v14: getSelectedModels() は編集モードかどうかを自動で判別
+            const selectedModels = getSelectedModels(); 
             if (selectedModels.length === 0) {
                 showToast("Please select at least one model", "warning"); return;
             }
@@ -1446,10 +1633,11 @@
             }
 
             // --- グリッド初期化 ---
+            // (v13と同じ)
             if (isEditingMode) {
-                imageGridContainer.innerHTML = ''; // 編集時はベース画像を消す
+                imageGridContainer.innerHTML = ''; 
             } else {
-                imageGridContainer.innerHTML = ''; // 通常生成時もクリア
+                imageGridContainer.innerHTML = ''; 
             }
             placeholder.style.display = 'none'; 
             updateGridColumns();
@@ -1463,16 +1651,14 @@
         }
         
 
-        // ★★★ 変更 (v13): フォアグラウンド (FG) 生成処理 ★★★
-        /**
-         * FG: フォアグラウンド生成 (v12の handleGenerationSubmit と同等)
-         */
+        // --- (v13と同じ FG/BG/Fetchロジック) ---
+        // (ここから下は v13 と v14 で変更はありません)
+        
         async function handleGenerationSubmit_FG(finalPrompt, selectedModels, selectedStyles) {
-            
             generationInProgress_FG = true;
             runningGenerations_FG.clear();
             currentFetchController_FG = new AbortController();
-            setLoading(generateButton, true); // Stopアイコン
+            setLoading(generateButton, true); 
             
             const isPrivateMode = document.getElementById('private-mode-toggle').checked;
             const retryCount = parseInt(autoRetrySelect.value, 10);
@@ -1489,7 +1675,7 @@
                 const isImagenJob = modelInfo.type === 'imagen';
 
                 const payload = {
-                    action: isImagenJob ? 'generate_fg' : 'edit_fg', // ★ v13: アクション名変更
+                    action: isImagenJob ? 'generate_fg' : 'edit_fg',
                     prompt: finalPrompt,
                     model: modelId, 
                     keyIndex: apiKeyCounter, 
@@ -1504,27 +1690,21 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
-                }, retryCount, currentFetchController_FG.signal) // ★ v13: FGのController
+                }, retryCount, currentFetchController_FG.signal)
                 .then(response => response.json())
                 .then(data => {
-                    // 成功
-                    if (data.error) throw new Error(data.error); // API側でキャッチしたエラー
-                    
+                    if (data.error) throw new Error(data.error);
                     const base64 = `data:image/png;base64,${data.base64}`;
                     updateImageCard(cardId, base64, finalPrompt, data.translatedPrompt || finalPrompt, data.base64, null, isPrivateMode);
                     saveImageToDB(finalPrompt, data.translatedPrompt || finalPrompt, base64, modelId, aspectRatioSelect.value, selectedStyles); 
-                    
                     if (!currentEditImageBase64 && data.base64) {
                         currentEditImageBase64 = data.base64;
                     }
                 })
                 .catch(error => {
-                    // 失敗 or キャンセル
                     if (error.name !== 'AbortError') {
                         console.error(`FG Generation error for ${modelId}:`, error);
                         updateImageCard(cardId, null, finalPrompt, null, null, error.message, isPrivateMode);
-                        // FGでは fetchWithRetry 内でエラーをGASに送る (v12互換)
-                        // ※ generate.js 側でエラー時にGAS送信するようになったので、ここでは不要
                     } else {
                         console.log(`FG Generation cancelled for ${modelId}`);
                         updateImageCard(cardId, null, finalPrompt, null, null, "Cancelled", isPrivateMode);
@@ -1535,29 +1715,20 @@
                     if (runningGenerations_FG.size === 0) {
                         generationInProgress_FG = false;
                         currentFetchController_FG = null;
-                        setLoading(generateButton, false); // Send/Editアイコン
-                        
+                        setLoading(generateButton, false); 
                         if (isEditingMode && !promptInput.value && selectedStyles.length > 0) {
                              promptInput.value = "";
                         }
                     }
                 });
-                
                 updateGridColumns();
             } 
         }
 
-        /**
-         * FG: リトライ付きFetch (v12とほぼ同じ)
-         */
         async function fetchWithRetry(url, options, retries = 0, signal = null) {
             let attempt = 0;
             const maxRetries = retries < 0 ? 0 : retries; 
-
-            if (signal) {
-                options.signal = signal;
-            }
-
+            if (signal) { options.signal = signal; }
             while (attempt <= maxRetries) {
                 try {
                     if (attempt > 0) {
@@ -1570,9 +1741,7 @@
                     }
                     return response; 
                 } catch (error) {
-                    if (error.name === 'AbortError') {
-                        throw error;
-                    }
+                    if (error.name === 'AbortError') { throw error; }
                     console.warn(`Attempt ${attempt} failed:`, error.message);
                     if (attempt === maxRetries) {
                         if (error.message.includes('401') || error.message.includes('Authentication failed')) {
@@ -1595,36 +1764,21 @@
             }
         }
         
-        // (省略: v12の sendErrorToGAS は v13では generate.js 側に集約)
-        
-        // ★★★ 新規 (v13): バックグラウンド (BG) 生成処理 ★★★
-        
-        /**
-         * BG: バックグラウンドジョブの投入とポーリング開始
-         */
         async function handleGenerationSubmit_BG(finalPrompt, selectedModels, selectedStyles) {
-            
-            isPolling_BG = true; // ★ ポーリング中に変更
-            setLoading(generateButton, true); // Stopアイコン
-            
+            isPolling_BG = true; 
+            setLoading(generateButton, true); 
             const isPrivateMode = document.getElementById('private-mode-toggle').checked;
             
             for (const modelId of selectedModels) {
                 apiKeyCounter++;
                 const modelInfo = MODELS[modelId];
-                
-                // ジョブIDとカードIDを生成
                 const jobId = `${Date.now()}-${modelId}-${Math.random().toString(36).substring(2, 9)}`;
                 const cardId = `image-card-bg-${jobId}`;
-                
-                // プレースホルダーカード (BGモード)
-                const card = createImageCard(cardId, modelInfo.name, true); // BGモード
+                const card = createImageCard(cardId, modelInfo.name, true); 
                 imageGridContainer.appendChild(card);
                 updateGridColumns();
 
                 const isGeminiJob = modelInfo.type === 'gemini-edit';
-
-                // KVに保存するジョブペイロード
                 const jobPayload = {
                     prompt: finalPrompt,
                     model: modelId, 
@@ -1633,7 +1787,6 @@
                     baseImage: (isEditingMode || isGeminiJob) ? currentEditImageBase64 : null
                 };
 
-                // KVにジョブを投入 (ウェイターAPI経由)
                 try {
                     const response = await fetch('/api/generate', {
                         method: 'POST',
@@ -1646,75 +1799,51 @@
                             jobPayload: jobPayload
                         })
                     });
-                    
                     const data = await response.json();
                     if (!response.ok || !data.success) {
                         throw new Error(data.error || "Failed to submit BG job");
                     }
-                    
-                    // ジョブ投入成功！ ポーリングリストに追加
                     pollingJobs_BG.add({
                         jobId: jobId,
                         cardId: cardId,
                         modelName: modelInfo.name,
                         prompt: finalPrompt,
-                        translatedPrompt: finalPrompt, // 初期値
+                        translatedPrompt: finalPrompt, 
                         isPrivateMode: isPrivateMode,
-                        model: modelId, // DB保存用
-                        aspectRatio: aspectRatioSelect.value, // DB保存用
-                        styles: selectedStyles // DB保存用
+                        model: modelId, 
+                        aspectRatio: aspectRatioSelect.value, 
+                        styles: selectedStyles 
                     });
-                    
                 } catch (error) {
-                    // ジョブ投入失敗 (KVエラーなど)
                     console.error(`Failed to submit BG job for ${modelId}:`, error);
                     updateImageCard(cardId, null, finalPrompt, null, null, `Job submission failed: ${error.message}`, isPrivateMode);
                 }
-            } // end for loop
+            }
             
-            // 全てのジョブ投入が終わったら、ポーリングを開始
             if (pollingJobs_BG.size > 0) {
                 startPolling_BG();
             } else {
-                // 1件も投入できなかった
                 isPolling_BG = false;
                 setLoading(generateButton, false);
             }
         }
         
-        /**
-         * BG: ポーリングを開始
-         */
         function startPolling_BG() {
-            if (pollingIntervalId_BG) {
-                clearInterval(pollingIntervalId_BG); // 念のため既存をクリア
-            }
-            
+            if (pollingIntervalId_BG) { clearInterval(pollingIntervalId_BG); }
             console.log(`Starting BG polling for ${pollingJobs_BG.size} jobs...`);
-            
-            // ポーリングタイマーを設定
             pollingIntervalId_BG = setInterval(async () => {
-                
-                // ポーリング対象がなくなったらタイマー停止
                 if (pollingJobs_BG.size === 0) {
-                    stopPolling_BG(false); // 正常停止
+                    stopPolling_BG(false); 
                     return;
                 }
-
-                // ポーリング中の全ジョブを並列でチェック
                 const checkPromises = [];
                 for (const job of pollingJobs_BG) {
                     checkPromises.push(checkJobStatus_BG(job));
                 }
-                
                 await Promise.allSettled(checkPromises);
-                
             }, POLLING_INTERVAL);
         }
         
-        /**
-         * BG: ジョブのステータスを1件チェック
-         */
         async function checkJobStatus_BG(job) {
             try {
                 const response = await fetch('/api/generate', {
@@ -1725,93 +1854,62 @@
                         jobId: job.jobId
                     })
                 });
-                
-                if (!response.ok) {
-                    // ネットワークエラーなど
-                    throw new Error(`Polling check failed: ${response.statusText}`);
-                }
-                
+                if (!response.ok) { throw new Error(`Polling check failed: ${response.statusText}`); }
                 const data = await response.json();
                 
                 if (data.status === "completed") {
-                    // ★ 完了！
                     console.log(`Job ${job.jobId} completed!`);
                     const base64 = `data:image/png;base64,${data.base64}`;
-                    
-                    // カード更新
                     updateImageCard(job.cardId, base64, job.prompt, data.translatedPrompt || job.prompt, data.base64, null, job.isPrivateMode);
-                    
-                    // DB保存
                     saveImageToDB(job.prompt, data.translatedPrompt || job.prompt, base64, job.model, job.aspectRatio, job.styles); 
-                    
-                    // ベース画像設定
                     if (!currentEditImageBase64 && data.base64) {
                         currentEditImageBase64 = data.base64;
                     }
-                    
-                    // ポーリングリストから削除
                     pollingJobs_BG.delete(job);
-                    
                 } else if (data.status === "error") {
-                    // ★ 失敗 (リトライオーバー)
                     console.error(`Job ${job.jobId} failed: ${data.error}`);
                     updateImageCard(job.cardId, null, job.prompt, null, null, `BG Error: ${data.error}`, job.isPrivateMode);
-                    // ポーリングリストから削除
                     pollingJobs_BG.delete(job);
-                    
                 } else if (data.status === "pending") {
-                    // ⏳ まだ処理中
                     console.log(`Job ${job.jobId} is still pending...`);
-                    // 何もしない (次のインターバルで再チェック)
-                    
                 } else {
-                    // 不明なステータス
                     throw new Error(`Unknown job status: ${data.status}`);
                 }
-                
             } catch (error) {
-                // ポーリング自体が失敗
                 console.error(`Error polling for job ${job.jobId}:`, error);
-                // (この場合、ポーリングは続行される)
             }
         }
         
-        /**
-         * BG: ポーリングを停止
-         */
         function stopPolling_BG(wasCancelled) {
             if (pollingIntervalId_BG) {
                 clearInterval(pollingIntervalId_BG);
                 pollingIntervalId_BG = null;
             }
-            
             if (wasCancelled) {
-                // キャンセルボタンが押された場合
-                // ポーリング中のカードを「キャンセル」表示にする
                 for (const job of pollingJobs_BG) {
                     updateImageCard(job.cardId, null, job.prompt, null, null, "Cancelled (BG)", job.isPrivateMode);
                 }
             }
-            
-            // リストをクリアし、状態をリセット
             pollingJobs_BG.clear();
             isPolling_BG = false;
-            setLoading(generateButton, false); // ボタンアイコンを戻す
+            setLoading(generateButton, false); 
             console.log("BG polling stopped.");
         }
 
 
-        // --- ★ v13: PROMPT HELPERS ---
-        // (省略: v12と同じ handlePromptCopy, handlePromptClear, handleTogglePromptSize 関数)
+        // --- ★ v14: PROMPT HELPERS (フッター最小化、全消去追加) ---
+        // (v13と同じ)
         function handlePromptCopy() {
             const textToCopy = promptInput.value;
             if (!textToCopy) { showToast("Nothing to copy", "info"); return; }
             copyToClipboard(textToCopy, "Prompt copied to clipboard!");
         }
+        // (v13と同じ)
         function handlePromptClear() {
             promptInput.value = "";
             showToast("Input cleared", "info");
         }
+        // (v13と同じ)
         function handleTogglePromptSize() {
             const icon = promptToggleSizeButton.querySelector('svg use');
             if (promptInput.rows === 2) {
@@ -1825,9 +1923,24 @@
             }
             setTimeout(adjustMainContentPadding, 100);
         }
+        
+        // ★★★ 新規 (v14): フッター最小化 ★★★
+        function handleToggleFooter() {
+            const icon = minimizeFooterButton.querySelector('svg use');
+            const isMinimized = promptFooter.classList.toggle('minimized');
+            
+            if (isMinimized) {
+                if (icon) icon.setAttribute('href', '#icon-chevrons-up');
+                minimizeFooterButton.dataset.tooltip = "Show Options";
+            } else {
+                if (icon) icon.setAttribute('href', '#icon-chevrons-down');
+                minimizeFooterButton.dataset.tooltip = "Minimize Options";
+            }
+            setTimeout(adjustMainContentPadding, 100);
+        }
 
         
-         // --- MODAL & TOAST (v12と同じ) ---
+         // --- (v13と同じ Modal & Toast) ---
         function showImageInModal(base64DataUrl, prompt, translatedPrompt, rawBase64) {
             modalImage.src = base64DataUrl;
             modalPrompt.textContent = translatedPrompt || prompt;
@@ -1847,14 +1960,14 @@
             promptInput.value = prompt;
             imageModal.classList.remove('flex');
             if (isEditingMode) { toggleEditMode(false); }
-            clearImageGrid(); 
+            handleClearGrid(); // ★ v14: clearImageGrid -> handleClearGrid
             handleGenerationSubmit(new Event('submit')); 
         }
         function handleModalEdit() {
             const base64 = modalEdit.dataset.base64;
             const prompt = modalEdit.dataset.prompt;
             loadUploadedImage(`data:image/png;base64,${base64}`, prompt, false); 
-            toggleEditMode(true, ['gemini-2.5-flash-image-preview']);
+            toggleEditMode(true); // ★ v14: 引数変更
             imageModal.classList.remove('flex');
         }
         function handleZoomIn() { modalZoomLevel = Math.min(modalZoomLevel * 1.5, MAX_ZOOM); updateZoom(); }
@@ -1918,6 +2031,7 @@
             });
         }
         function setLoading(button, isLoading) {
+            // (v13と同じ)
             if (button.id === 'auth-submit') {
                 if (isLoading) { button.disabled = true; button.innerHTML = '<svg class="w-5 h-5 text-white animate-spin mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-loader"></use></svg>'; } 
                 else { button.disabled = false; button.innerHTML = 'Login'; }
@@ -1940,7 +2054,7 @@
                     button.disabled = false;
                     button.classList.remove('bg-red-600', 'hover:bg-red-700');
                     button.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-                    if (isEditingMode) {
+                    if (isEditingMode) { // ★ v14: isEditingMode はグローバル変数
                         if (icon) icon.setAttribute('href', '#icon-edit');
                         button.dataset.tooltip = "Apply Edit";
                     } else {
@@ -1955,10 +2069,10 @@
             }
         }
 
-        // --- D&D / Upload (v12と同じ) ---
+        // --- (v13と同じ D&D / Upload) ---
         function handleDragOver(event) {
             event.preventDefault();
-            if (generationInProgress || isEditingMode) return;
+            if (generationInProgress_FG || isPolling_BG || isEditingMode) return; // ★ v14: isPolling_BG も
             imageDisplay.classList.add('drag-over');
         }
         function handleDragLeave(event) {
@@ -1968,7 +2082,7 @@
         function handleDrop(event) {
             event.preventDefault();
             imageDisplay.classList.remove('drag-over');
-            if (generationInProgress) return;
+            if (generationInProgress_FG || isPolling_BG) return; // ★ v14: isPolling_BG も
             const file = event.dataTransfer.files[0];
             if (file && file.type.startsWith('image/')) { readImageFile(file); } 
             else { showToast("Please drop an image file (PNG, JPG, etc.)", "warning"); }
@@ -1989,10 +2103,10 @@
             currentEditImageBase64 = rawBase64; 
             if (!isSwitchingBase) {
                 imageGridContainer.innerHTML = ''; 
-                // ★ v13: ポーリング停止
-                stopAllPolling();
+                // ★ v14: ポーリング停止
+                if (isPolling_BG) { stopPolling_BG(true); } 
                 const cardId = `image-card-base-${Date.now()}`;
-                const card = createImageCard(cardId, "Base Image", false); // ★ v13
+                const card = createImageCard(cardId, "Base Image", false); 
                 imageGridContainer.appendChild(card);
                 updateImageCard(cardId, base64DataUrl, prompt, prompt, rawBase64, null, false); 
                 updatePlaceholderVisibility();
@@ -2003,22 +2117,18 @@
             else { promptInput.value = ""; }
         }
         
-        // ★ v13: カード作成 (BGモードの表示切替追加)
+        // (v13と同じ)
         function createImageCard(cardId, modelName, isBGMode = false) {
             const card = document.createElement('div');
             card.id = cardId;
             card.className = "image-card flex flex-col"; 
-            
-            // ★ v13: BGモードの時は「Queued...」と表示
             const statusText = isBGMode ? "Queued for BG..." : "Generating...";
-
             card.innerHTML = `
                 <div class="loading-spinner flex flex-col items-center justify-center text-gray-400 p-4 flex-1">
                     <svg class="w-10 h-10 text-indigo-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-loader"></use></svg>
                     <p class="mt-2 text-sm font-medium">${modelName}</p>
                     <p class="mt-1 text-xs text-gray-500">${statusText}</p>
                 </div>
-                
                 <div class="relative w-full h-auto flex-1 group hidden">
                     <img src="" class="hidden max-w-full max-h-full object-contain rounded-lg mx-auto">
                     <div class="error-message hidden text-red-300 text-sm p-2 break-words max-h-full overflow-y-auto"></div>
@@ -2042,7 +2152,7 @@
             return card;
         }
 
-        // (v12と同じ)
+        // ★★★ 変更 (v14): カード削除時のポーリング停止ロジック修正 ★★★
         function updateImageCard(cardId, base64DataUrl, prompt, translatedPrompt, rawBase64, errorMsg = null, isPrivateMode = false) {
             const card = document.getElementById(cardId);
             if (!card) return;
@@ -2058,6 +2168,7 @@
             imgContainer.classList.remove('hidden'); 
 
             if (errorMsg) {
+                // (v13と同じ)
                 errorDiv.textContent = errorMsg;
                 errorDiv.classList.remove('hidden');
                 overlay.classList.remove('hidden');
@@ -2066,8 +2177,8 @@
                 overlay.querySelector('.image-blur-btn').style.display = 'none'; 
                 card.classList.add('bg-red-900/50'); 
                 modelNameDisplay.classList.remove('hidden');
-
             } else {
+                // (v13と同じ)
                 img.src = base64DataUrl;
                 img.classList.remove('hidden');
                 overlay.classList.remove('hidden');
@@ -2081,7 +2192,7 @@
                     editBtn.style.display = 'block';
                     editBtn.onclick = () => {
                         loadUploadedImage(base64DataUrl, prompt, true); 
-                        toggleEditMode(true, ['gemini-2.5-flash-image-preview']); 
+                        toggleEditMode(true); // ★ v14: 引数変更
                     };
                 } else {
                      editBtn.style.display = 'none';
@@ -2090,7 +2201,6 @@
                 const blurBtn = card.querySelector('.image-blur-btn');
                 const blurIcon = blurBtn.querySelector('svg use');
                 let isBlurred = isPrivateMode; 
-
                 const updateBlurState = () => {
                     img.classList.toggle('image-blurred', isBlurred);
                     if (blurIcon) { blurIcon.setAttribute('href', isBlurred ? '#icon-eye' : '#icon-eye-off'); }
@@ -2105,8 +2215,18 @@
                 card.remove();
                 updatePlaceholderVisibility();
                 updateGridColumns(); 
-                // ★ v13: ポーリング中だったら停止
-                stopPolling(cardId);
+                
+                // ★ v14: BGポーリング中なら、該当ジョブをリストから削除
+                if (isPolling_BG && cardId.startsWith('image-card-bg-')) {
+                    const jobId = cardId.replace('image-card-bg-', '');
+                    for (const job of pollingJobs_BG) {
+                        if (job.jobId === jobId) {
+                            pollingJobs_BG.delete(job);
+                            console.log(`Removed job ${jobId} from polling list.`);
+                            break;
+                        }
+                    }
+                }
             };
         }
 
