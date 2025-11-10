@@ -107,6 +107,11 @@
             z-index: 60;
         }
 
+        /* ★ 依頼①: 削除確認モーダルも z-index を最上位(60)に */
+        #delete-confirm-modal {
+            z-index: 60;
+        }
+
         /* ★ 依頼: モーダル画像のラッパー */
         #modal-image-wrapper {
             transition: all 0.3s ease;
@@ -215,6 +220,15 @@
             /* ★ 依頼①: アスペクト比を削除 */
             /* aspect-ratio: 1 / 1; */
         }
+
+        /* ★★★ 修正箇所 (依頼3) ★★★ */
+        /* ぼかし用フィルター */
+        .image-blurred {
+            filter: blur(16px);
+            /* ぼかし解除のトランジションを滑らかに */
+            transition: filter 0.2s ease-in-out;
+        }
+        /* ★★★ 修正箇所ここまで ★★★ */
         /* ★★★ 修正箇所ここまで ★★★ */
 
 
@@ -223,7 +237,7 @@
 <body class="bg-gray-900 text-gray-100 min-h-screen w-screen flex">
 
     <svg width="0" height="0" class="hidden">
-        <!-- (省略: アイコン定義は変更なし) -->
+        <!-- (省略: 既存アイコン) -->
         <symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="icon-menu">
             <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
         </symbol>
@@ -287,10 +301,27 @@
         </symbol>
         <!-- ★★★ 修正箇所ここまで ★★★ -->
 
+        <!-- ★★★ 修正箇所 (依頼3) ★★★ -->
+        <!-- ぼかし（目）アイコン -->
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-eye">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>
+        </symbol>
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-eye-off">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>
+        </symbol>
+        <!-- ★★★ 修正箇所ここまで ★★★ -->
+
+        <!-- ★★★ 修正箇所 (依頼1) ★★★ -->
+        <!-- 削除（ゴミ箱）アイコン -->
+        <symbol xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" id="icon-trash">
+            <polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </symbol>
+        <!-- ★★★ 修正箇所ここまで ★★★ -->
+
     </svg>
 
     <aside id="sidebar" class="bg-gray-800 h-screen w-64 p-4 flex flex-col flex-shrink-0 fixed z-30 transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
-        <!-- (省略: サイドバーの中身は変更なし) -->
+        <!-- (省略: サイドバーヘッダー) -->
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-xl font-bold text-white">muGen History</h1>
             <button id="close-sidebar" class="md:hidden text-gray-400 hover:text-white">
@@ -313,7 +344,17 @@
             </div>
         </div>
 
-        <div id="history-container" class="flex-1 overflow-y-auto sidebar-scroll space-y-2">
+        <!-- ★★★ 修正箇所 (依頼1) ★★★ -->
+        <!-- 履歴削除ボタン -->
+        <div class="mt-4 pt-4 border-t border-gray-700">
+            <button id="clear-history-button" class="w-full flex items-center justify-center gap-2 bg-red-800/50 hover:bg-red-700 text-red-200 py-2 px-4 rounded-lg transition" data-tooltip="Clear local history (requires password)">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-trash"></use></svg>
+                <span>Clear History</span>
+            </button>
+        </div>
+        <!-- ★★★ 修正箇所ここまで ★★★ -->
+
+        <div id="history-container" class="flex-1 overflow-y-auto sidebar-scroll space-y-2 mt-4"> <!-- ★ mt-4 追加 -->
             <p class="text-gray-400 text-sm">No generated images yet.</p>
         </div>
     </aside>
@@ -321,7 +362,7 @@
     <main id="main-content" class="flex-1 flex flex-col transition-all duration-300 ease-in-out md:ml-64 min-h-screen">
         
         <header class="flex-shrink-0 bg-gray-900/70 backdrop-blur-sm h-16 flex items-center px-6 shadow-md z-20">
-            <!-- (省略: ヘッダーの中身は変更なし) -->
+            <!-- (省略: ヘッダー) -->
             <button id="sidebar-toggle-button" class="text-gray-400 hover:text-white mr-4" data-tooltip="Toggle History">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-menu"></use></svg>
             </button>
@@ -337,15 +378,13 @@
         </header>
 
         <div id="image-container" class="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-hidden">
-            <!-- ★ 変更: image-display (オーバーフローとパディングの制御) -->
+            <!-- (省略: image-display, image-grid-container, placeholder, loading-animation) -->
             <div id="image-display" class="w-full h-full flex items-center justify-center bg-gray-800 rounded-lg shadow-inner relative border-2 border-transparent transition-all overflow-auto p-4"> 
-                <!-- ★ 変更: image-grid-container (TailwindクラスはJSで動的に制御) -->
                 <div id="image-grid-container" class="w-full h-full grid gap-4">
                     <!-- (画像カードはJSによってここに追加されます) -->
                 </div>
         
                 <div id="placeholder" class="text-gray-500 flex-col items-center justify-center p-8 text-center absolute inset-0 flex"> 
-                    <!-- (省略: プレースホルダーの中身は変更なし) -->
                     <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>
                     <p class="mt-2">Your generated image(s) will appear here</p>
                     <p class="text-sm mt-4">or</p>
@@ -358,7 +397,6 @@
                 </div>
 
                 <div id="loading-animation" class="noise-container">
-                    <!-- (省略: ローディングアニメーションの中身は変更なし) -->
                     <div class="absolute inset-0 flex items-center justify-center">
                         <svg class="w-12 h-12 text-indigo-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-loader"></use></svg>
                     </div>
@@ -369,7 +407,7 @@
 
         <footer id="prompt-footer" class="p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm z-10 fixed bottom-0 w-full md:left-64 transition-all duration-300 ease-in-out">
             <form id="generation-form" class="max-w-4xl mx-auto">
-                <!-- (省略: フッターの中身は変更なし) -->
+                <!-- (省略: オプションツールバー) -->
                 <div class="flex flex-wrap gap-4 mb-4" id="options-toolbar">
                     
                     <div id="model-select-group" class="w-full md:w-auto relative"> <button type="button" id="models-toggle" class="flex justify-between items-center w-full p-2.5 rounded-lg bg-gray-700 border border-gray-600 hover:bg-gray-600 transition">
@@ -410,6 +448,19 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
                             Edit with 2.0 flash
                         </button>
+                        
+                        <!-- ★★★ 修正箇所 (依頼3) ★★★ -->
+                        <!-- プライベートモード (ぼかし) トグル -->
+                        <div id="private-mode-group" class="flex items-end">
+                            <div class="relative flex items-center gap-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5 h-full">
+                                <input id="private-mode-toggle" type="checkbox" class="w-5 h-5 text-indigo-600 bg-gray-800 border-gray-600 rounded focus:ring-indigo-500">
+                                <label for="private-mode-toggle" class="cursor-pointer font-medium" data-tooltip="Blur images upon generation">
+                                    Private Mode
+                                </label>
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-eye-off"></use></svg>
+                            </div>
+                        </div>
+                        <!-- ★★★ 修正箇所ここまで ★★★ -->
                     </div>
                 </div>
 
@@ -420,12 +471,17 @@
                             <use href="#icon-chevron-down"></use>
                         </svg>
                     </button>
+                    <!-- ★★★ 修正箇所 (依頼2) ★★★ -->
+                    <!-- 選択中スタイルのプレビューエリア -->
+                    <div id="selected-styles-preview" class="hidden flex-wrap gap-2 p-2 bg-gray-900/50 rounded-lg mt-2 cursor-pointer" data-tooltip="Click to edit styles">
+                        <!-- Selected styles will be shown here -->
+                    </div>
+                    <!-- ★★★ 修正箇所ここまで ★★★ -->
                     <div id="styles-container" class="hidden max-h-48 overflow-y-auto flex flex-wrap gap-2 p-3 bg-gray-700/50 rounded-lg mt-2">
                         </div>
                 </div>
 
-                <!-- ★★★ 修正箇所 (依頼3) ★★★ -->
-                <!-- ★ 追加: 翻訳候補表示コンテナ -->
+                <!-- (省略: 翻訳候補コンテナ) -->
                 <div id="prompt-suggestions-container" class="hidden mb-4 p-3 bg-gray-700/50 rounded-lg max-h-48 overflow-y-auto">
                     <p class="text-sm text-gray-300 mb-2">Multiple prompt suggestions found. Select desired prompts:</p>
                     <div id="prompt-suggestions-list" class="space-y-2">
@@ -435,7 +491,6 @@
                         Set Selected Prompts
                     </button>
                 </div>
-                <!-- ★★★ 修正箇所ここまで ★★★ -->
 
 
                 <div id="edit-mode-indicator" class="hidden text-center text-indigo-300 text-sm font-medium p-2 bg-indigo-900/50 rounded-lg mt-3">
@@ -443,18 +498,13 @@
                 </div>
 
                 <div class="relative mt-4">
-                    <!-- ★ 修正: pr-56 (ボタン5個分) -->
+                    <!-- (省略: プロンプト入力欄) -->
                     <textarea id="prompt-input" rows="2" class="block w-full p-4 pr-56 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Enter your prompt... (Non-English will be translated)"></textarea>
                     
-                    <!-- ★ 修正: right-32 -> right-44 -->
                     <div class="absolute bottom-3 right-44 flex space-x-2">
-                         <!-- ★★★ 修正箇所 (依頼2) ★★★ -->
-                         <!-- ★ 追加: 拡大・縮小ボタン -->
                          <button id="prompt-toggle-size-button" type="button" class="p-2 bg-gray-600 text-gray-400 rounded-lg hover:bg-gray-500 hover:text-gray-200 transition" data-tooltip="Toggle Size">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-maximize"></use></svg>
                         </button>
-                         <!-- ★★★ 修正箇所ここまで ★★★ -->
-                         
                          <button id="prompt-copy-button" type="button" class="p-2 bg-gray-600 text-gray-400 rounded-lg hover:bg-gray-500 hover:text-gray-200 transition" data-tooltip="Copy Prompt">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-copy"></use></svg>
                         </button>
@@ -476,7 +526,7 @@
         </footer>
     </main>
 
-    <!-- (省略: モーダル、トースト、認証モーダルの中身は変更なし) -->
+    <!-- (省略: 画像モーダル) -->
     <div id="image-modal" class="modal">
         <div class="bg-gray-800 rounded-lg shadow-xl w-11/12 max-w-6xl max-h-[95vh] flex flex-col p-4">
             
@@ -522,6 +572,7 @@
         </div>
     </div>
 
+    <!-- (省略: トースト) -->
     <div id="toast" class="fixed top-20 right-6 text-white py-3 px-4 rounded-lg shadow-lg transition-all duration-300 opacity-0 -translate-y-10 z-50">
         <div class="flex items-start justify-between">
             <p id="toast-message" class="flex-1 pr-4">Message</p>
@@ -536,6 +587,7 @@
         </div>
     </div>
     
+    <!-- (省略: 認証モーダル) -->
     <div id="auth-modal" class="modal flex"> <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
             <div class="flex items-center justify-center mb-4">
                 <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-lock"></use></svg>
@@ -551,6 +603,31 @@
             </form>
         </div>
     </div>
+
+    <!-- ★★★ 修正箇所 (依頼1) ★★★ -->
+    <!-- 履歴削除 確認モーダル -->
+    <div id="delete-confirm-modal" class="modal"> 
+        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
+            <div class="flex items-center justify-center mb-4">
+                <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-trash"></use></svg>
+                <h2 class="text-xl font-bold text-white ml-2">Clear History?</h2>
+            </div>
+            <p class="text-gray-400 text-center text-sm mb-4">This action is irreversible. Please enter your password to confirm deletion of all local history.</p>
+            <form id="delete-confirm-form">
+                <input type="password" id="delete-confirm-password" class="block w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Password" required>
+                <p id="delete-confirm-error" class="text-red-400 text-sm mt-2 hidden"></p>
+                <div class="flex gap-4 mt-4">
+                     <button id="cancel-delete-button" type="button" class="w-full p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition font-medium">
+                        Cancel
+                    </button>
+                    <button id="confirm-delete-button" type="submit" class="w-full p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium">
+                        Delete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- ★★★ 修正箇所ここまで ★★★ -->
 
 
     <script>
@@ -700,6 +777,10 @@
         const stylesContainer = document.getElementById('styles-container');
         const stylesChevron = document.getElementById('styles-chevron');
 
+        // ★★★ 修正箇所 (依頼2) ★★★
+        const selectedStylesPreview = document.getElementById('selected-styles-preview');
+        // ★★★ 修正箇所ここまで ★★★
+
         // ★ History Stats Elements
         const statsTotalImages = document.getElementById('stats-total-images');
         const statsCostUsd = document.getElementById('stats-cost-usd');
@@ -725,6 +806,17 @@
         const authSubmit = document.getElementById('auth-submit');
         const authError = document.getElementById('auth-error');
 
+        // ★★★ 修正箇所 (依頼1) ★★★
+        // 履歴削除モーダルのDOM
+        const clearHistoryButton = document.getElementById('clear-history-button');
+        const deleteConfirmModal = document.getElementById('delete-confirm-modal');
+        const deleteConfirmForm = document.getElementById('delete-confirm-form');
+        const deleteConfirmPassword = document.getElementById('delete-confirm-password');
+        const deleteConfirmError = document.getElementById('delete-confirm-error');
+        const confirmDeleteButton = document.getElementById('confirm-delete-button');
+        const cancelDeleteButton = document.getElementById('cancel-delete-button');
+        // ★★★ 修正箇所ここまで ★★★
+
 
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -744,6 +836,10 @@
             adjustMainContentPadding();
             // ★★★ 修正箇所 (依頼②・③) ★★★
             updatePlaceholderVisibility(); // ★ 追加
+            // ★★★ 修正箇所ここまで ★★★
+            
+            // ★★★ 修正箇所 (依頼2) ★★★
+            updateSelectedStylesPreview(false); // ★ 初期状態ではプレビューを隠す
             // ★★★ 修正箇所ここまで ★★★
         });
 
@@ -864,7 +960,7 @@
         }
 
 
-        // --- (Omitted: IndexedDB functions for brevity) ---
+        // --- IndexedDB functions ---
         function initDB() {
             const request = indexedDB.open("muGenDB", 1);
 
@@ -915,7 +1011,7 @@
                 console.error("Error saving to DB:", event.target.error);
                 if (event.target.error.name === 'QuotaExceededError') {
                     showToast("History storage is full. Clearing old entries...", "warning");
-                    clearOldHistory();
+                    clearOldHistory(); // ★ ここは古い履歴を削除する (依頼1とは別)
                 }
             };
         }
@@ -1018,15 +1114,77 @@
             };
         }
         
+        // quota超過時に古いものを削除する (依頼1とは別)
         function clearOldHistory() {
             if (!db) return;
             const transaction = db.transaction(["images"], "readwrite");
             const objectStore = transaction.objectStore("images");
+            // ★ 依頼1 での全体削除と区別するため、ここでは全削除は行わない
+            //    (本来は古いものから順に削除すべきだが、簡易的に全削除)
             objectStore.clear().onsuccess = () => {
-                showToast("Old history cleared.", "success");
+                showToast("History storage was full. All history cleared.", "warning");
                 loadHistory();
             };
         }
+
+        // ★★★ 修正箇所 (依頼1) ★★★
+        /**
+         * 履歴削除の認証と実行
+         */
+        async function handleClearHistory(event) {
+            event.preventDefault();
+            const password = deleteConfirmPassword.value;
+            if (!password) {
+                deleteConfirmError.textContent = "Password is required.";
+                deleteConfirmError.classList.remove('hidden');
+                return;
+            }
+
+            setLoading(confirmDeleteButton, true); // ボタンをローディング状態に
+            deleteConfirmError.classList.add('hidden');
+
+            try {
+                // 既存の認証ロジックを再利用
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'auth',
+                        password: password
+                    })
+                });
+
+                if (response.ok) {
+                    // 認証成功 -> DBクリア
+                    if (!db) {
+                         throw new Error("Database not initialized.");
+                    }
+                    const transaction = db.transaction(["images"], "readwrite");
+                    const objectStore = transaction.objectStore("images");
+                    const request = objectStore.clear();
+
+                    request.onsuccess = () => {
+                        showToast("History cleared successfully!", "success");
+                        loadHistory(); // 統計と表示を更新
+                        deleteConfirmModal.classList.remove('flex'); // モーダルを閉じる
+                    };
+                    request.onerror = (e) => {
+                         throw new Error("Failed to clear database: " + e.target.error);
+                    };
+
+                } else {
+                    const data = await response.json();
+                    throw new Error(data.error || "Authentication failed");
+                }
+            } catch (error) {
+                console.error("History clear error:", error);
+                deleteConfirmError.textContent = error.message;
+                deleteConfirmError.classList.remove('hidden');
+            } finally {
+                setLoading(confirmDeleteButton, false); // ボタンのローディング解除
+            }
+        }
+        // ★★★ 修正箇所ここまで ★★★
 
         // --- UI INITIALIZATION ---
 
@@ -1113,6 +1271,18 @@
                     };
                     div.appendChild(removeBtn);
                 }
+
+                // ★★★ 修正箇所 (依頼2) ★★★
+                // スタイルチェックボックスの変更イベント
+                div.querySelector('input[type="checkbox"]').addEventListener('change', () => {
+                    // アコーディオンが閉じている時だけプレビューを更新する
+                    if (!stylesContainer.classList.contains('hidden')) {
+                         updateSelectedStylesPreview(false); // プレビューは隠す
+                    } else {
+                         updateSelectedStylesPreview(true); // プレビューを表示
+                    }
+                });
+                // ★★★ 修正箇所ここまで ★★★
                 
                 container.appendChild(div);
             });
@@ -1137,6 +1307,19 @@
         function initListeners() {
             // ★ 認証フォーム
             authForm.addEventListener('submit', handleAuthSubmit);
+            
+            // ★★★ 修正箇所 (依頼1) ★★★
+            // 履歴削除ボタンとモーダルのリスナー
+            clearHistoryButton.addEventListener('click', () => {
+                deleteConfirmModal.classList.add('flex');
+                deleteConfirmPassword.value = ''; // パスワード欄をクリア
+                deleteConfirmError.classList.add('hidden'); // エラーを隠す
+            });
+            deleteConfirmForm.addEventListener('submit', handleClearHistory); // submitイベントに変更
+            cancelDeleteButton.addEventListener('click', () => {
+                deleteConfirmModal.classList.remove('flex');
+            });
+            // ★★★ 修正箇所ここまで ★★★
 
             generationForm.addEventListener('submit', handleGenerationSubmit); // ★ 変更あり
             translateButton.addEventListener('click', handleTranslate); // ★ 変更あり
@@ -1196,6 +1379,16 @@
             });
 
             stylesToggleBtn.addEventListener('click', toggleStylesAccordion);
+            
+            // ★★★ 修正箇所 (依頼2) ★★★
+            // プレビューエリアをクリックしてもアコーディオンを開く
+            selectedStylesPreview.addEventListener('click', () => {
+                if (stylesContainer.classList.contains('hidden')) {
+                    toggleStylesAccordion(); // 閉じてたら開く
+                }
+            });
+            // ★★★ 修正箇所ここまで ★★★
+            
             promptInput.addEventListener('keydown', handlePromptKeydown);
 
             // ★ 追加: ドラッグ＆ドロップリスナー
@@ -1234,7 +1427,7 @@
         
         function handleTouchStart(event) {
             // 認証モーダル表示中はスワイプ無効
-            if (authModal.classList.contains('flex')) return;
+            if (authModal.classList.contains('flex') || deleteConfirmModal.classList.contains('flex')) return; // ★ 依頼1: 削除モーダル中も無効
 
             const firstTouch = event.touches[0];
             touchStartX = firstTouch.clientX;
@@ -1243,7 +1436,7 @@
         }
 
         function handleTouchMove(event) {
-            if (authModal.classList.contains('flex')) return;
+            if (authModal.classList.contains('flex') || deleteConfirmModal.classList.contains('flex')) return;
             // Y軸の移動が大きい場合はスクロールとみなし、スワイプ処理を中断
             if (Math.abs(event.touches[0].clientX - touchStartX) < Math.abs(event.touches[0].clientY - touchStartY)) {
                 touchStartX = 0; // スワイプ開始位置をリセット
@@ -1253,7 +1446,7 @@
         }
 
         function handleTouchEnd() {
-            if (authModal.classList.contains('flex')) return;
+            if (authModal.classList.contains('flex') || deleteConfirmModal.classList.contains('flex')) return;
             if (touchStartX === 0) return; // スワイプ開始されていない
 
             const deltaX = touchMoveX - touchStartX;
@@ -1427,13 +1620,43 @@
         // ★★★ 修正箇所ここまで ★★★
 
 
+        // ★★★ 修正箇所 (依頼2) ★★★
         function toggleStylesAccordion() {
-            stylesContainer.classList.toggle('hidden');
+            // hidden が *付いた* かどうか (true = 閉じた)
+            const isClosing = stylesContainer.classList.toggle('hidden'); 
             stylesChevron.classList.toggle('rotate-180');
+            
+            updateSelectedStylesPreview(isClosing); // 閉じていたらプレビューを表示、開いていたら隠す
             
             // ★ 追加: フッターの高さが変わるのでパディングを再調整
             setTimeout(adjustMainContentPadding, 100);
         }
+
+        /**
+         * ★ 新規 (依頼2): 選択中のスタイルプレビューを更新する
+         * @param {boolean} showPreview - プレビューコンテナを表示するかどうか
+         */
+        function updateSelectedStylesPreview(showPreview = false) {
+            if (!showPreview) {
+                selectedStylesPreview.classList.add('hidden');
+                return;
+            }
+
+            const selectedStyles = Array.from(document.querySelectorAll('.style-checkbox:checked'));
+            
+            if (selectedStyles.length > 0) {
+                selectedStylesPreview.innerHTML = selectedStyles.map(cb => {
+                    // ★ escapeHTML を使って安全に表示
+                    return `<span class="bg-indigo-600 text-white text-xs font-medium px-2.5 py-0.5 rounded-full">${escapeHTML(cb.value)}</span>`;
+                }).join('');
+                selectedStylesPreview.classList.remove('hidden');
+            } else {
+                selectedStylesPreview.innerHTML = '';
+                selectedStylesPreview.classList.add('hidden');
+            }
+        }
+        // ★★★ 修正箇所ここまで ★★★
+
 
         function handlePromptKeydown(event) {
             if (isMobile) {
@@ -1700,9 +1923,10 @@
         }
 
         /**
-         * ★ 追加 (依頼3): HTMLエスケープ用
+         * ★ 追加 (依頼3 / 依頼2): HTMLエスケープ用
          */
         function escapeHTML(str) {
+            if (typeof str !== 'string') return '';
             return str.replace(/[&<>"']/g, function(match) {
                 return {
                     '&': '&amp;',
@@ -1792,6 +2016,10 @@
             // ★ 削除 (依頼④): プレースホルダーを隠す処理を上に移動
             // updatePlaceholderVisibility(); 
 
+            // ★★★ 修正箇所 (依頼3) ★★★
+            const isPrivateMode = document.getElementById('private-mode-toggle').checked;
+            // ★★★ 修正箇所ここまで ★★★
+
             const retryCount = parseInt(autoRetrySelect.value, 10);
             const generationPromises = [];
 
@@ -1834,7 +2062,9 @@
                 .then(data => {
                     // ★ 成功
                     const base64 = `data:image/png;base64,${data.base64}`;
-                    updateImageCard(cardId, base64, finalPrompt, data.translatedPrompt || finalPrompt, data.base64);
+                    // ★★★ 修正箇所 (依頼3) ★★★
+                    updateImageCard(cardId, base64, finalPrompt, data.translatedPrompt || finalPrompt, data.base64, null, isPrivateMode); // ★ 依頼3: isPrivateMode を渡す
+                    // ★★★ 修正箇所ここまで ★★★
                     
                     // ★ 変更: DB保存
                     saveImageToDB(finalPrompt, data.translatedPrompt || finalPrompt, base64, modelId, aspectRatioSelect.value, selectedStyles); 
@@ -1850,11 +2080,15 @@
                     // ★ 失敗 (リトライ含む) or キャンセル
                     if (error.name !== 'AbortError') {
                         console.error(`Generation error for ${modelId}:`, error);
-                        updateImageCard(cardId, null, finalPrompt, null, null, error.message); // エラー表示
+                        // ★★★ 修正箇所 (依頼3) ★★★
+                        updateImageCard(cardId, null, finalPrompt, null, null, error.message, isPrivateMode); // エラー表示
+                        // ★★★ 修正箇所ここまで ★★★
                         sendErrorToGAS(payload, error.message);
                     } else {
                         console.log(`Generation cancelled for ${modelId}`);
-                        updateImageCard(cardId, null, finalPrompt, null, null, "Cancelled"); // キャンセル表示
+                        // ★★★ 修正箇所 (依頼3) ★★★
+                        updateImageCard(cardId, null, finalPrompt, null, null, "Cancelled", isPrivateMode); // キャンセル表示
+                        // ★★★ 修正箇所ここまで ★★★
                     }
                 })
                 .finally(() => {
@@ -2165,7 +2399,7 @@
         }
         
         // ★ 変更: アイコン切り替え (isEditingMode 対応)
-        // ★★★ 修正箇所 (依頼②・③) ★★★
+        // ★★★ 修正箇所 (依頼①・②・③) ★★★
         function setLoading(button, isLoading) {
             // ★ 認証ボタンのローディング処理
             if (button.id === 'auth-submit') {
@@ -2178,6 +2412,20 @@
                 }
                 return;
             }
+
+            // ★★★ 修正箇所 (依頼1) ★★★
+            // 削除確認ボタンのローディング処理
+            if (button.id === 'confirm-delete-button') {
+                if (isLoading) {
+                    button.disabled = true;
+                    button.innerHTML = '<svg class="w-5 h-5 text-white animate-spin mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-loader"></use></svg>';
+                } else {
+                    button.disabled = false;
+                    button.innerHTML = 'Delete';
+                }
+                return;
+            }
+            // ★★★ 修正箇所ここまで ★★★
         
             if (button.id === 'generate-button') {
                 const icon = button.querySelector('svg use');
@@ -2282,9 +2530,12 @@
                 
                 // ★ クリアしたグリッドに、読み込んだ画像を1枚だけ表示
                 const cardId = `image-card-base-${Date.now()}`;
+                // ★★★ 修正箇所 (依頼3) ★★★
+                // 読み込んだ画像は「ぼかしOFF」で作成
                 const card = createImageCard(cardId, "Base Image");
                 imageGridContainer.appendChild(card);
-                updateImageCard(cardId, base64DataUrl, prompt, prompt, rawBase64);
+                updateImageCard(cardId, base64DataUrl, prompt, prompt, rawBase64, null, false); // isPrivateMode = false
+                // ★★★ 修正箇所ここまで ★★★
                 updatePlaceholderVisibility();
                 updateGridColumns(); // ★ 依頼①: アップロード時
             }
@@ -2335,6 +2586,12 @@
                         <button class="image-edit-btn bg-gray-800 text-white p-2 rounded-full hover:bg-blue-600" data-tooltip="Use as Edit Base">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>
                         </button>
+                        <!-- ★★★ 修正箇所 (依頼3) ★★★ -->
+                        <!-- ぼかしトグルボタン -->
+                        <button class="image-blur-btn bg-gray-800 text-white p-2 rounded-full hover:bg-yellow-600" data-tooltip="Toggle Blur">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-eye-off"></use></svg>
+                        </button>
+                        <!-- ★★★ 修正箇所ここまで ★★★ -->
                         <button class="image-close-btn bg-gray-800 text-white p-2 rounded-full hover:bg-red-600" data-tooltip="Remove">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
                         </button>
@@ -2352,7 +2609,8 @@
          * ★ 新規: 画像カードの状態を更新 (成功/エラー)
          */
         // ★★★ 修正箇所 (依頼①・②・③) ★★★
-        function updateImageCard(cardId, base64DataUrl, prompt, translatedPrompt, rawBase64, errorMsg = null) {
+        // ★ 依頼3: isPrivateMode 引数を追加
+        function updateImageCard(cardId, base64DataUrl, prompt, translatedPrompt, rawBase64, errorMsg = null, isPrivateMode = false) {
             const card = document.getElementById(cardId);
             if (!card) return;
 
@@ -2373,6 +2631,7 @@
                 overlay.classList.remove('hidden');
                 overlay.querySelector('.image-zoom-btn').style.display = 'none';
                 overlay.querySelector('.image-edit-btn').style.display = 'none';
+                overlay.querySelector('.image-blur-btn').style.display = 'none'; // ★ 依頼3: エラー時はぼかしボタン非表示
                 card.classList.add('bg-red-900/50'); // エラー背景
                 
                 // ★ 依頼③: エラー時もモデル名を表示
@@ -2406,6 +2665,31 @@
                 } else {
                      editBtn.style.display = 'none';
                 }
+
+                // ★★★ 修正箇所 (依頼3) ★★★
+                // ぼかし機能の初期化とリスナー設定
+                const blurBtn = card.querySelector('.image-blur-btn');
+                const blurIcon = blurBtn.querySelector('svg use');
+                let isBlurred = isPrivateMode; // 初期状態 (生成時設定)
+
+                // ぼかし状態を更新する内部関数
+                const updateBlurState = () => {
+                    img.classList.toggle('image-blurred', isBlurred);
+                    if (blurIcon) {
+                        blurIcon.setAttribute('href', isBlurred ? '#icon-eye' : '#icon-eye-off');
+                    }
+                    blurBtn.dataset.tooltip = isBlurred ? "Show Image" : "Blur Image";
+                };
+
+                updateBlurState(); // 初期状態を適用
+
+                // ぼかしボタンのクリックイベント
+                blurBtn.onclick = (e) => {
+                    e.stopPropagation(); // 親のズームイベントを発火させない
+                    isBlurred = !isBlurred; // 状態を反転
+                    updateBlurState();
+                };
+                // ★★★ 修正箇所ここまで ★★★
             }
             
             // 削除ボタン
