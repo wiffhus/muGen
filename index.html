@@ -360,6 +360,23 @@
                     <!-- ★★★ 変更ここまで ★★★ -->
 
                 </div>
+                <!-- ★★★ ここから追加 ★★★ -->
+                           <!-- API Rotation Mode -->
+                           <div id="api-rotation-group" class="flex items-center">
+                                <div class="relative flex items-center gap-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-2.5 h-full w-full">
+                                    <input id="api-rotation-toggle" type="checkbox" class="w-5 h-5 text-indigo-600 bg-gray-800 border-gray-600 rounded focus:ring-indigo-500">
+                                    <label for="api-rotation-toggle" class="cursor-pointer font-medium" data-tooltip="API Key Rotation (Reduces usage limits per key)">
+                                        API Rotation
+                                    </label>
+                                    <svg class="w-5 h-5 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-refresh"></use></svg>
+                                </div>
+                            </div>
+                           <!-- ★★★ 追加ここまで ★★★ -->
+
+                        </div>
+                    </div>
+                    <!-- ★★★ 変更ここまで ★★★ -->
+                
 
                 <!-- ★★★ 変更 (v14): ID追加 ★★★ -->
                 <div class="mb-4" id="styles-toggle-area">
@@ -662,6 +679,9 @@
         const modeOptionsChevron = document.getElementById('mode-options-chevron');
         const modeOptionsPreview = document.getElementById('mode-options-preview');
         const privateModeToggle = document.getElementById('private-mode-toggle');
+         // ★★★ 以下を追加 ★★★
+        const apiRotationToggle = document.getElementById('api-rotation-toggle');
+        // ★★★ 追加ここまで ★★★
         
         // フッターエリア
         const promptInputArea = document.getElementById('prompt-input-area');
@@ -1026,6 +1046,10 @@
                 updateModeOptionsPreview(); // ★ v14: プレビュー更新
             });
 
+             // ★★★ 以下を追加 ★★★
+            apiRotationToggle.addEventListener('change', updateModeOptionsPreview);
+            // ★★★ 追加ここまで ★★★
+
             // 画像モーダル
             modalClose.addEventListener('click', () => imageModal.classList.remove('flex'));
             modalCopy.addEventListener('click', handleModalCopy);
@@ -1291,13 +1315,16 @@
             }
         }
         
-        // ★★★ 新規 (v14): Modeプレビュー更新 ★★★
+       // ★★★ 関数全体を以下のように修正 ★★★
         function updateModeOptionsPreview() {
             const isPrivate = privateModeToggle.checked;
             const isBG = bgModeToggle.checked;
+            const isRotation = apiRotationToggle.checked; // ★追加
+            
             let previewText = [];
             if (isPrivate) previewText.push("Private");
             if (isBG) previewText.push("BG");
+            if (isRotation) previewText.push("Rot"); // ★追加
             
             if (previewText.length === 0) {
                 modeOptionsPreview.textContent = "(Off)";
@@ -1305,6 +1332,7 @@
                 modeOptionsPreview.textContent = previewText.join(' + ');
             }
         }
+        // ★★★ 修正ここまで ★★★
 
         // (v13と同じ)
         function handleModelSelectionChange() {
@@ -1523,7 +1551,9 @@
             promptSuggestionsList.innerHTML = '';
             setLoading(translateButton, true);
             try {
-                apiKeyCounter++; // 翻訳でもキーをローテーション
+                 if (apiRotationToggle.checked) {
+                    apiKeyCounter++; // ローテーションがONの時だけインクリメント
+                }
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 100000); 
                 const response = await fetchWithRetry('/api/generate', {
@@ -1676,7 +1706,11 @@
             const retryCount = parseInt(autoRetrySelect.value, 10);
             
             for (const modelId of selectedModels) {
-                apiKeyCounter++;
+                // ★★★ 以下のように修正 ★★★
+                if (apiRotationToggle.checked) {
+                    apiKeyCounter++; // ローテーションがONの時だけインクリメント
+                }
+                // ★★★ 修正ここまで ★★★
                 const modelInfo = MODELS[modelId];
 
                 const cardId = `image-card-fg-${modelId}-${apiKeyCounter}`;
@@ -1782,7 +1816,11 @@
             const isPrivateMode = document.getElementById('private-mode-toggle').checked;
             
             for (const modelId of selectedModels) {
-                apiKeyCounter++;
+                 // ★★★ 以下のように修正 ★★★
+                if (apiRotationToggle.checked) {
+                    apiKeyCounter++; // ローテーションがONの時だけインクリメント
+                }
+                // ★★★ 修正ここまで ★★★
                 const modelInfo = MODELS[modelId];
                 const jobId = `${Date.now()}-${modelId}-${Math.random().toString(36).substring(2, 9)}`;
                 const cardId = `image-card-bg-${jobId}`;
