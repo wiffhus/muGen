@@ -407,6 +407,24 @@
                     🎨 Editing Mode - Subsequent generations will edit the current image. (Change model to Imagen 3.0 to exit)
                 </div>
 
+                <div id="reference-image-area" class="hidden p-3 bg-gray-900/50 rounded-lg mt-3">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Reference Image (Optional)</label>
+                    <div id="reference-image-dropzone" class="flex items-center justify-center w-full h-24 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer hover:bg-gray-700 transition">
+                        <div id="reference-image-placeholder" class="text-center text-gray-500">
+                            <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-upload"></use></svg>
+                            <p class="text-xs mt-1">Drop reference image or click</p>
+                        </div>
+                        <div id="reference-image-preview" class="hidden w-full h-full p-1 relative group">
+                            <img id="reference-image-thumbnail" src="" class="w-full h-full object-contain rounded">
+                            <button id="reference-image-clear-btn" type="button" class="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition" data-tooltip="Remove reference image">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <input type="file" id="reference-image-input" class="hidden" accept="image/png, image/jpeg, image/webp">
+                </div>
+                <div class="relative mt-4" id="prompt-input-area">
+
                 <!-- ★★★ 変更 (v14): ID追加 ★★★ -->
                 <div class="relative mt-4" id="prompt-input-area">
                     <textarea id="prompt-input" rows="2" class="block w-full p-4 pr-56 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Enter your prompt... (Non-English will be translated)"></textarea>
@@ -564,7 +582,10 @@
         let isEditingMode = false;
         let lastEnterPress = 0; 
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
+        // ★★★ v15: 追加 ★★★
+        let currentReferenceImageBase64 = null; // 参照画像のBase64
+        // ★★★ v15: 追加ここまで ★★★
+        
         // FG (フォアグラウンド) 用の変数
         let generationInProgress_FG = false; 
         let runningGenerations_FG = new Set(); 
@@ -685,6 +706,15 @@
         const promptInputArea = document.getElementById('prompt-input-area');
         const stylesToggleArea = document.getElementById('styles-toggle-area');
         // ★★★ 追加ここまで ★★★
+        // ★★★ v15: 追加 ★★★
+        const referenceImageArea = document.getElementById('reference-image-area');
+        const referenceImageDropzone = document.getElementById('reference-image-dropzone');
+        const referenceImagePlaceholder = document.getElementById('reference-image-placeholder');
+        const referenceImagePreview = document.getElementById('reference-image-preview');
+        const referenceImageThumbnail = document.getElementById('reference-image-thumbnail');
+        const referenceImageClearBtn = document.getElementById('reference-image-clear-btn');
+        const referenceImageInput = document.getElementById('reference-image-input');
+        // ★★★ v15: 追加ここまで ★★★
 
 
         // --- INITIALIZATION ---
@@ -1081,10 +1111,20 @@
             imageDisplay.addEventListener('dragleave', handleDragLeave);
             imageDisplay.addEventListener('drop', handleDrop);
 
+    
             // ファイルアップロード
             uploadImageButton.addEventListener('click', () => uploadImageInput.click());
             uploadImageInput.addEventListener('change', handleFileSelect);
 
+
+            // ★★★ v15: 参照画像のD&Dとアップロード ★★★
+            referenceImageDropzone.addEventListener('dragover', handleReferenceDragOver);
+            referenceImageDropzone.addEventListener('dragleave', handleReferenceDragLeave);
+            referenceImageDropzone.addEventListener('drop', handleReferenceDrop);
+            referenceImageDropzone.addEventListener('click', () => referenceImageInput.click());
+            referenceImageInput.addEventListener('change', handleReferenceFileSelect);
+            referenceImageClearBtn.addEventListener('click', handleReferenceClear);
+            // ★★★ v15: 追加ここまで ★★★
             // リサイズ
             window.addEventListener('resize', adjustMainContentPadding);
 
@@ -1514,6 +1554,10 @@
 
                 imageDisplay.classList.add('ring-4', 'ring-indigo-500');
                 if (!stylesContainer.classList.contains('hidden')) { toggleStylesAccordion(); }
+
+                // ★★★ v15: 追加 ★★★
+                referenceImageArea.classList.remove('hidden');
+                // ★★★ v15: 追加ここまで ★★★
                 
                 editModeIndicator.textContent = `🎨 Editing Mode - Select Edit Models (2.0/2.5) to use.`;
                 editModeIndicator.classList.remove('hidden');
@@ -1532,6 +1576,10 @@
 
                 imageDisplay.classList.remove('ring-4', 'ring-indigo-500');
                 editModeIndicator.classList.add('hidden');
+                // ★★★ v15: 追加 ★★★
+                referenceImageArea.classList.add('hidden');
+                handleReferenceClear(); // 編集モード解除時に参照画像もクリア
+                // ★★★ v15: 追加ここまで ★★★
             }
             
             // ツールバー（Aspect/Styles/Retry）の表示を更新
@@ -1727,6 +1775,9 @@
                     aspectRatio: aspectRatioSelect.value, 
                     styles: selectedStyles,
                     baseImage: (isEditingMode || isGeminiJob) ? currentEditImageBase64 : null
+                    // ★★★ v15: 追加 ★★★
+                    referenceImage: (isEditingMode || isGeminiJob) ? currentReferenceImageBase64 : null
+                    // ★★★ v15: 追加ここまで ★★★
                 };
 
                 runningGenerations_FG.add(cardId);
@@ -1835,6 +1886,10 @@
                     aspectRatio: aspectRatioSelect.value, 
                     styles: selectedStyles,
                     baseImage: (isEditingMode || isGeminiJob) ? currentEditImageBase64 : null
+                    baseImage: (isEditingMode || isGeminiJob) ? currentEditImageBase64 : null,
+                    // ★★★ v15: 追加 ★★★
+                    referenceImage: (isEditingMode || isGeminiJob) ? currentReferenceImageBase64 : null
+                    // ★★★ v15: 追加ここまで ★★★
                 };
 
                 try {
@@ -2165,6 +2220,62 @@
             showToast("Image loaded. Ready to edit.", "info");
             if (prompt) { promptInput.value = prompt; } 
             else { promptInput.value = ""; }
+            // ★★★ v15: 参照画像ハンドラ (ここに追加) ★★★
+        function handleReferenceDragOver(event) {
+            event.preventDefault();
+            referenceImageDropzone.classList.add('drag-over'); // (drag-over スタイルは v14 CSS にあります)
+        }
+        function handleReferenceDragLeave(event) {
+            event.preventDefault();
+            referenceImageDropzone.classList.remove('drag-over');
+        }
+        function handleReferenceDrop(event) {
+            event.preventDefault();
+            referenceImageDropzone.classList.remove('drag-over');
+            const file = event.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                readReferenceImageFile(file);
+            } else {
+                showToast("Please drop an image file", "warning");
+            }
+        }
+        function handleReferenceFileSelect(event) {
+            const file = event.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                readReferenceImageFile(file);
+            }
+            referenceImageInput.value = null; // 同じファイルを選択できるように
+        }
+        function readReferenceImageFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64DataUrl = e.target.result;
+                currentReferenceImageBase64 = base64DataUrl.split(',')[1];
+                
+                referenceImageThumbnail.src = base64DataUrl;
+                referenceImagePlaceholder.classList.add('hidden');
+                referenceImagePreview.classList.remove('hidden');
+                showToast("Reference image loaded", "info");
+            };
+            reader.onerror = (e) => {
+                showToast("Failed to read reference image.", "error");
+                handleReferenceClear();
+            };
+            reader.readAsDataURL(file);
+        }
+        function handleReferenceClear(event) {
+            if (event) event.stopPropagation(); // Dropzoneのクリックイベントを発火させない
+            
+            currentReferenceImageBase64 = null;
+            referenceImageThumbnail.src = "";
+            referenceImagePlaceholder.classList.remove('hidden');
+            referenceImagePreview.classList.add('hidden');
+            referenceImageInput.value = null;
+            console.log("Reference image cleared.");
+        }
+        // ★★★ v15: 追加ここまで ★★★
+
+            
         }
         
         // (v13と同じ)
