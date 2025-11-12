@@ -19,7 +19,7 @@
 const GEMINI_API_URL_FLASH_IMAGE_2_5 = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent";
 const GEMINI_API_URL_FLASH_IMAGE_2_0 = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent";
 const GEMINI_API_URL_FLASH = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
-
+const VEO_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:generateVideo"; // ★ Veo用URL (仮)
 
 /**
  * APIキーを取得する
@@ -29,10 +29,12 @@ function getApiKey(context, model, keyIndex) {
     const index = (keyIndex || 0) % keyPoolSize + 1;
     const keyIndexStr = index.toString().padStart(2, '0');
     
-    let apiKeyEnvVar;
+   let apiKeyEnvVar;
     
     if (model === 'gemini-2.5-flash-image-preview' || model === 'gemini-2.0-flash-preview-image-generation') {
         apiKeyEnvVar = `GEMINI_FLASH_IMAGE_API_KEY_${keyIndexStr}`;
+    } else if (model === 'veo-2.0-generate-001') { // ★ Veo用キー
+        apiKeyEnvVar = `VEO_API_KEY_${keyIndexStr}`;
     } else {
         apiKeyEnvVar = `GEMINI_API_KEY_${keyIndexStr}`;
     }
@@ -79,8 +81,12 @@ export async function onRequest(context) {
                 response = await handleTranslate(data, translateApiKey);
                 break;
 
-            // --- ★ v13: BG (バックグラウンド) アクション ---
+           // --- ★ v13: BG (バックグラウンド) アクション ---
             case 'submit_bg_job':
+                response = await handleSubmitBgJob(data, context);
+                break;
+            case 'submit_bg_video_job': // ★ Veo用BGジョブ登録
+                // ( handleSubmitBgJob がモデル名をペイロードに含めているため、流用可能)
                 response = await handleSubmitBgJob(data, context);
                 break;
             case 'check_bg_job':
@@ -92,7 +98,12 @@ export async function onRequest(context) {
                 const genApiKey = getApiKey(context, model, keyIndex);
                 response = await handleGenerate_FG(data, genApiKey, context);
                 break;
+            case 'generate_video_fg': // ★ Veo用FG生成
+                const veoApiKey = getApiKey(context, model, keyIndex);
+                response = await handleGenerateVideo_FG(data, veoApiKey, context); // ★ 新しい関数を呼ぶ
+                break;
             case 'edit_fg': // 'edit' -> 'edit_fg' に変更
+                 if (model === 'gemini-2.5-flash-image-preview' || model === 'gemini-2.0-flash-preview-image-generation') {
                  if (model === 'gemini-2.5-flash-image-preview' || model === 'gemini-2.0-flash-preview-image-generation') {
                     const editApiKey = getApiKey(context, model, keyIndex);
                     response = await handleEdit_FG(data, editApiKey, context);
@@ -330,10 +341,7 @@ async function handleGenerate_FG(data, apiKey, context) {
         enhancedPrompt += `, ${styles.join(', ')} style`;
     }
 
-    let apiModelName = model;
-    if (model === 'imagen-3.0-generate') {
-        apiModelName = 'imagen-3.0-generate-002';
-    }
+  
     
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModelName}:predict?key=${apiKey}`;
     
@@ -484,4 +492,232 @@ async function handleEdit_FG(data, apiKey, context) {
     return new Response(JSON.stringify({ base64: base64, translatedPrompt: prompt }), {
         headers: { 'Content-Type': 'application/json' },
     });
+}
+
+/**
+ * GCPサービスアカウントキーを使用してOAuthアクセストークンを取得する
+ * (シークレット 'GCP_SERVICE_ACCOUNT_KEY' にJSONキー全体を設定する必要がある)
+ */
+async function getGcpAuthToken(context) {
+    try {
+        const keyData = JSON.parse(context.env.GCP_SERVICE_ACCOUNT_KEY);
+        const scope = "https://www.googleapis.com/auth/cloud-platform";
+        
+        const header = { alg: "RS256", typ: "JWT" };
+        const iat = Math.floor(Date.now() / 1000);
+        const exp = iat + 3600; // 1時間有効
+
+        const claims = {
+            iss: keyData.client_email,
+            sub: keyData.client_email,
+            aud: "https://oauth2.googleapis.com/token",
+            scope: scope,
+            iat: iat,
+            exp: exp,
+        };
+
+        const jwt = await signJwt(header, claims, keyData.private_key);
+
+        const response = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                assertion: jwt,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch GCP token: ${await response.text()}`);
+        }
+
+        const tokenData = await response.json();
+        return tokenData.access_token;
+
+    } catch (error) {
+        console.error("Error in getGcpAuthToken:", error);
+        throw new Error(`Failed to get GCP Auth Token: ${error.message}`);
+    }
+}
+
+/**
+ * JWTの署名ヘルパー (Web Crypto APIを使用)
+ */
+async function signJwt(header, payload, privateKeyPem) {
+    const cryptoKey = await importPrivateKey(privateKeyPem);
+    const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
+    
+    const signature = await crypto.subtle.sign(
+        { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+        cryptoKey,
+        data
+    );
+    
+    const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+        .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+        
+    return `${headerB64}.${payloadB64}.${signatureB64}`;
+}
+async function importPrivateKey(pem) {
+    const pemHeader = "-----BEGIN PRIVATE KEY-----";
+    const pemFooter = "-----END PRIVATE KEY-----";
+    const pemContents = pem.substring(pemHeader.length, pem.lastIndexOf(pemFooter)).replace(/\s/g, '');
+    const binaryDer = atob(pemContents);
+    const der = new Uint8Array(binaryDer.length);
+    for (let i = 0; i < binaryDer.length; i++) {
+        der[i] = binaryDer.charCodeAt(i);
+    }
+    return crypto.subtle.importKey(
+        "pkcs8", der,
+        { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+        true, ["sign"]
+    );
+}
+
+/**
+ * GCPのLong Running Operationをポーリングする
+ */
+async function checkGcpOperation(operationName, authToken, maxWaitMs = 45000) { // FGの上限は約50秒
+    const pollInterval = 3000; // 3秒ごとに確認
+    const startTime = Date.now();
+    const apiUrl = `https://aiplatform.googleapis.com/v1/${operationName}`;
+
+    while (Date.now() - startTime < maxWaitMs) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+        const response = await fetch(apiUrl, {
+            headers: { "Authorization": `Bearer ${authToken}` }
+        });
+
+        if (!response.ok) {
+            console.error(`Operation check failed: ${await response.text()}`);
+            continue; // タイムアウトまでリトライ
+        }
+
+        const opData = await response.json();
+
+        if (opData.done) {
+            if (opData.error) {
+                throw new Error(`Veo operation failed: ${opData.error.message}`);
+            }
+            console.log("Veo operation completed.");
+            return opData.response; // 完了したレスポンス
+        }
+        // else: まだ "done: false"
+    }
+
+    throw new Error("Veo operation timed out in FG mode. (Consider using BG mode)");
+}
+
+
+/**
+ * ★ Veo用 FGハンドラ (OAuth / Long Running Operation 対応版)
+ * (注: FGでの実行はタイムアウトのリスクが非常に高いです)
+ */
+async function handleGenerateVideo_FG(data, apiKey_ignored, context) {
+    const { prompt, model } = data;
+
+    // --- 1. 環境変数の確認 (必須) ---
+    const { 
+        GCP_PROJECT_ID, 
+        GCP_LOCATION, 
+        VEO_MODEL_ID, 
+        GCS_STORAGE_URI,
+        GCP_SERVICE_ACCOUNT_KEY 
+    } = context.env;
+    
+    if (!GCP_PROJECT_ID || !GCP_LOCATION || !VEO_MODEL_ID || !GCS_STORAGE_URI || !GCP_SERVICE_ACCOUNT_KEY) {
+        throw new Error("Veo configuration missing (Project, Location, Model, Storage URI, or Service Account Key)");
+    }
+
+    try {
+        // --- 2. GCP OAuthトークンを取得 ---
+        const authToken = await getGcpAuthToken(context);
+
+        // --- 3. VeoのAPIエンドポイントとペイロード (仕様書準拠) ---
+        const apiUrl = `https://"${GCP_LOCATION}-aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${GCP_LOCATION}/publishers/google/models/${VEO_MODEL_ID}:predictLongRunning`;
+        
+        // (注: Veoのパラメータは Imagenと異なるため、aspectRatioなどは使えません)
+        const payload = {
+            "instances": [
+                { "prompt": prompt }
+            ],
+            "parameters": {
+                "durationSeconds": 5, // 5秒の動画 (固定)
+                "sampleCount": 1,
+                "storageUri": GCS_STORAGE_URI, // ★ 結果の保存先 (GCS)
+                "generateAudio": true
+            }
+        };
+
+        // --- 4. Veo非同期ジョブを開始 ---
+        const startResponse = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                "Authorization": `Bearer ${authToken}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!startResponse.ok) {
+            throw new Error(`Veo API Error (Start): ${await startResponse.text()}`);
+        }
+
+        const operation = await startResponse.json();
+        const operationName = operation.name;
+        if (!operationName) {
+            throw new Error("Veo API did not return an operation name.");
+        }
+
+        console.log(`Veo operation started: ${operationName}`);
+
+        // --- 5. 結果をポーリング (FGのタイムアウト限界まで) ---
+        // (注: 5秒の動画でも、生成開始までに時間がかかるとここでタイムアウトします)
+        const result = await checkGcpOperation(operationName, authToken, 45000); // 45秒待つ
+
+        // --- 6. 結果の処理 ---
+        // (注: Veoはbase64を返さず、GCS URIを返す可能性が高いです)
+        const gcsUri = result.storageUri; // (仮のレスポンス形式)
+        const base64Thumbnail = result.thumbnailBase64; // (仮にサムネイルがある場合)
+
+        if (!base64Thumbnail && !gcsUri) {
+             throw new Error("Veo operation finished, but no video URI or thumbnail found.");
+        }
+        
+        // GASにはサムネイル(base64Thumbnail)を保存する
+        // (もしサムネイルも無ければ、gcsUriをエラー代わりに保存)
+        const base64ForGas = base64Thumbnail || "gcs:" + gcsUri; 
+        const translatedPromptForGas = `[Veo Video] ${prompt} (Result at: ${gcsUri || 'N/A'})`;
+
+        // GASに保存
+        const gasUrl = context.env.GAS_WEB_APP_URL;
+        if (gasUrl) {
+            const saveData = {
+                prompt: prompt,
+                translatedPrompt: translatedPromptForGas,
+                base64Data: base64ForGas,
+                model: model
+            };
+            context.waitUntil(
+                fetch(gasUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(saveData)
+                }).catch(err => console.error("GAS save error (FG):", err))
+            );
+        }
+
+        // フロントエンドにはサムネイル(base64Thumbnail)を返す
+        return new Response(JSON.stringify({ base64: base64ForGas, translatedPrompt: translatedPromptForGas }), {
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+    } catch (error) {
+        console.error("handleGenerateVideo_FG Error:", error);
+        await handleErrorLog({ prompt: prompt, model: model, error: `Veo FG Error: ${error.message}` }, context);
+        return new Response(JSON.stringify({ error: `Failed to generate video (Veo): ${error.message}` }), { status: 500 });
+    }
 }
