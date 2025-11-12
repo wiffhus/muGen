@@ -1,5 +1,6 @@
 /**
  * Cloudflare Function (Node.js) - v13 (ウェイター)
+ * ★★★ v15: 参照画像 (referenceImage) 対応 ★★★
  *
  * FG (フォアグラウンド) モード:
  * - action 'generate_fg', 'edit_fg'
@@ -95,6 +96,7 @@ export async function onRequest(context) {
             case 'edit_fg': // 'edit' -> 'edit_fg' に変更
                  if (model === 'gemini-2.5-flash-image-preview' || model === 'gemini-2.0-flash-preview-image-generation') {
                     const editApiKey = getApiKey(context, model, keyIndex);
+                    // ★★★ v15: handleEdit_FG を修正版に差し替え ★★★
                     response = await handleEdit_FG(data, editApiKey, context);
                 } else {
                     response = new Response(JSON.stringify({ error: 'Invalid model for FG editing' }), { status: 400 });
@@ -252,7 +254,7 @@ async function handleSubmitBgJob(data, context) {
         jobId: jobId,
         model: model,
         keyIndex: keyIndex, // シェフが使うAPIキーのインデックス
-        jobPayload: jobPayload, // (prompt, aspectRatio, styles, baseImage)
+        jobPayload: jobPayload, // (prompt, aspectRatio, styles, baseImage, referenceImage)
         retryCount: 0, // リトライ回数
         submittedAt: new Date().toISOString()
     };
