@@ -548,14 +548,16 @@
             "imagen-4.0-ultra-generate-preview-06-06": { name: "Imagen 4.0 Ultra", type: "imagen" },
             "imagen-4.0-generate-preview-06-06": { name: "Imagen 4.0", type: "imagen" },
             "imagen-4.0-fast-generate-001": { name: "Imagen 4.0 Fast", type: "imagen" },
-            "imagen-3.0-generate": { name: "Imagen 3.0", type: "imagen" },
-            // Gemini (Edit)
             "gemini-2.5-flash-image-preview": { name: "Gemini 2.5 Flash", type: "gemini-edit", short: "2.5" },
             "gemini-2.0-flash-preview-image-generation": { name: "Gemini 2.0 Flash", type: "gemini-edit", short: "2.0" }
+　　　　　　// ★ Veo (動画) を追加
+            "veo-2.0-generate-001": { name: "Veo 2.0 (Video)", type: "veo" },
+            
         };
         const PRICE_IMAGEN_USD = 0.02;
         const PRICE_GEMINI_FLASH_IMAGE_USD = 0.002;
         const PRICE_GEMINI_FLASH_IMAGE_2_0_USD = 0.002;
+        const PRICE_VEO_USD = 0.05; // ★ Veoの価格を仮定義
         const USD_JPY_RATE = 150; 
 
         let db;
@@ -860,8 +862,7 @@
                         historyContainer.appendChild(div);
 
                         // (v13と同じコスト計算)
-                        if (item.model === 'imagen-3.0-generate' || 
-                            item.model === 'imagen-4.0-generate-preview-06-06' || 
+                        if (item.model === 'imagen-4.0-generate-preview-06-06' || 
                             item.model === 'imagen-4.0-ultra-generate-preview-06-06' ||
                             item.model === 'imagen-4.0-fast-generate-001') {
                             totalCostUSD += PRICE_IMAGEN_USD;
@@ -1155,8 +1156,8 @@
             for (const [modelId, modelInfo] of Object.entries(MODELS)) {
                 
                 // ★★★ 変更点 ★★★
-                // 'imagen' と 'gemini-edit' タイプをメインコンテナに追加 (v14改)
-                if (modelInfo.type !== 'imagen' && modelInfo.type !== 'gemini-edit') continue;
+                // 'imagen' と 'veo' タイプをメインコンテナに追加
+                if (modelInfo.type !== 'imagen' && modelInfo.type !== 'veo') continue;
                 // ★★★ 変更ここまで ★★★
 
 
@@ -1166,10 +1167,14 @@
                 let labelClass = "cursor-pointer text-gray-300 hover:bg-gray-700 p-2 rounded-md flex items-center border border-transparent";
                 let modelTypeIcon;
 
-                // タイプ別にアイコンを分ける (v14改)
+                // タイプ別にアイコンを分ける
                 if (modelInfo.type === 'imagen') {
                     modelTypeIcon = `<svg class="w-4 h-4 mr-2 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>`;
-                } else { // gemini-edit
+                } else if (modelInfo.type === 'veo') {
+                    // ★ Veo用のアイコンを追加 (仮に clock を使用)
+                    modelTypeIcon = `<svg class="w-4 h-4 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-clock"></use></svg>`;
+                } else { 
+                    // (gemini-edit は initEditModels で処理されるため、ここには来ない想定)
                     modelTypeIcon = `<svg class="w-4 h-4 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>`;
                 }
                 // ★★★ 変更ここまで ★★★
@@ -1186,7 +1191,6 @@
                 modelsContainer.appendChild(div);
                 div.querySelector('input').addEventListener('change', handleModelSelectionChange);
             }
-            
             // ★ v14: デフォルト選択を削除
             // const defaultModel = document.getElementById('model-imagen-4.0-fast-generate-001');
             // if (defaultModel) {
@@ -1363,15 +1367,16 @@
         }
         
         // (v13と同じ)
-        function updateToolbarForSelection() {
+       function updateToolbarForSelection() {
             const selectedModels = getSelectedModels(); // ★ v14: getSelectedModels() は修正済み
             
             // isEditingMode は getSelectedModels の結果に依存しない (toggleEditMode で制御)
             const hasImagen = selectedModels.some(modelId => MODELS[modelId]?.type === 'imagen') && !isEditingMode;
+            const hasVeo = selectedModels.some(modelId => MODELS[modelId]?.type === 'veo') && !isEditingMode; // ★ Veoが選択されているか
             const isBGMode = bgModeToggle.checked;
 
             // 1. Imagen系 (Aspect Ratio, Styles)
-            if (hasImagen) {
+            if (hasImagen && !hasVeo) { // ★ Imagenのみ選択されている場合
                 aspectRatioGroup.style.display = 'block';
                 stylesToggleBtn.style.display = 'flex';
             } else {
@@ -1710,7 +1715,7 @@
                     apiKeyCounter++; // ローテーションがONの時だけインクリメント
                 }
                 // ★★★ 修正ここまで ★★★
-                const modelInfo = MODELS[modelId];
+              const modelInfo = MODELS[modelId];
 
                 const cardId = `image-card-fg-${modelId}-${apiKeyCounter}`;
                 const card = createImageCard(cardId, modelInfo.name, false); // FGモード
@@ -1718,9 +1723,17 @@
 
                 const isGeminiJob = modelInfo.type === 'gemini-edit';
                 const isImagenJob = modelInfo.type === 'imagen';
+                const isVeoJob = modelInfo.type === 'veo'; // ★ Veoジョブか判定
+
+                // ★ actionを分岐
+                let action_fg;
+                if (isImagenJob) action_fg = 'generate_fg';
+                else if (isGeminiJob) action_fg = 'edit_fg';
+                else if (isVeoJob) action_fg = 'generate_video_fg'; // ★ Veo用アクション
+                else action_fg = 'generate_fg'; // デフォルト
 
                 const payload = {
-                    action: isImagenJob ? 'generate_fg' : 'edit_fg',
+                    action: action_fg, // ★ 修正
                     prompt: finalPrompt,
                     model: modelId, 
                     keyIndex: apiKeyCounter, 
@@ -1829,6 +1842,7 @@
                 updateGridColumns();
 
                 const isGeminiJob = modelInfo.type === 'gemini-edit';
+                const isVeoJob = modelInfo.type === 'veo'; // ★ Veoジョブか判定
                 const jobPayload = {
                     prompt: finalPrompt,
                     model: modelId, 
@@ -1837,6 +1851,11 @@
                     baseImage: (isEditingMode || isGeminiJob) ? currentEditImageBase64 : null
                 };
 
+                // ★ actionを分岐 (BGジョブ登録時)
+                let action_bg_submit;
+                if (isVeoJob) action_bg_submit = 'submit_bg_video_job'; // ★ Veo用BGアクション
+                else action_bg_submit = 'submit_bg_job'; // 既存の画像・編集用
+                
                 try {
                     const response = await fetch('/api/generate', {
                         method: 'POST',
