@@ -1,6 +1,5 @@
 /**
  * Cloudflare Function (Node.js) - v13 (ウェイター)
- * ★★★ v15: 参照画像 (referenceImage) 対応 ★★★
  *
  * FG (フォアグラウンド) モード:
  * - action 'generate_fg', 'edit_fg'
@@ -96,7 +95,6 @@ export async function onRequest(context) {
             case 'edit_fg': // 'edit' -> 'edit_fg' に変更
                  if (model === 'gemini-2.5-flash-image-preview' || model === 'gemini-2.0-flash-preview-image-generation') {
                     const editApiKey = getApiKey(context, model, keyIndex);
-                    // ★★★ v15: handleEdit_FG を修正版に差し替え ★★★
                     response = await handleEdit_FG(data, editApiKey, context);
                 } else {
                     response = new Response(JSON.stringify({ error: 'Invalid model for FG editing' }), { status: 400 });
@@ -254,7 +252,7 @@ async function handleSubmitBgJob(data, context) {
         jobId: jobId,
         model: model,
         keyIndex: keyIndex, // シェフが使うAPIキーのインデックス
-        jobPayload: jobPayload, // (prompt, aspectRatio, styles, baseImage, referenceImage)
+        jobPayload: jobPayload, // (prompt, aspectRatio, styles, baseImage)
         retryCount: 0, // リトライ回数
         submittedAt: new Date().toISOString()
     };
@@ -404,11 +402,9 @@ async function handleGenerate_FG(data, apiKey, context) {
 
 /**
  * FG: Gemini Flash Image (v12の handleEdit)
- * ★★★ v15: 参照画像 (referenceImage) に対応 ★★★
  */
 async function handleEdit_FG(data, apiKey, context) {
-    // ★ v15: referenceImage を分割代入で取得
-    const { prompt, baseImage, model, referenceImage } = data; 
+    const { prompt, baseImage, model } = data; 
     
     const isEditMode = !!baseImage;
 
@@ -419,33 +415,12 @@ async function handleEdit_FG(data, apiKey, context) {
         apiUrl = `${GEMINI_API_URL_FLASH_IMAGE_2_5}?key=${apiKey}`;
     }
     
-    // ★ v15: userParts の構築ロジックを変更
-    const userParts = [];
-    
-    // 1. テキスト指示
-    // 参照画像がある場合、AIが混乱しないよう「これは指示です」と明記します
-    if (referenceImage) {
-        userParts.push({ text: `[Instruction] ${prompt}` });
-    } else {
-        userParts.push({ text: prompt });
-    }
-    
-    // 2. ベース画像 (必須)
+    const userParts = [{ text: prompt }];
     if (isEditMode) {
         userParts.push({
             inlineData: { mimeType: "image/png", data: baseImage }
         });
     }
-
-    // 3. 参照画像 (オプション)
-    if (referenceImage) {
-        // AIに「これは参照画像です」と伝えます
-        userParts.push({ text: "[Reference Image]" }); 
-        userParts.push({
-            inlineData: { mimeType: "image/png", data: referenceImage }
-        });
-    }
-    // ★ v15: 変更ここまで
 
     const payload = {
         contents: [{ role: "user", parts: userParts }],
