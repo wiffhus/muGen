@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>muGen - AI Image Generator (v15)</title>
+    <title>muGen - AI Image Generator (v14)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* (v13と同じ Inter Font, Custom scrollbar, Noise Animation, Custom Checkbox) */
@@ -132,8 +132,7 @@
         #prompt-footer.minimized #prompt-input-area,
         #prompt-footer.minimized #options-toolbar,
         #prompt-footer.minimized #styles-toggle-area,
-        #prompt-footer.minimized #prompt-suggestions-container,
-        #prompt-footer.minimized #reference-image-area { /* ★ v15: 参照エリアも */
+        #prompt-footer.minimized #prompt-suggestions-container {
             display: none;
         }
         /* ★★★ 追加ここまで ★★★ */
@@ -393,25 +392,6 @@
                     🎨 Editing Mode - Subsequent generations will edit the current image. (Change model to Imagen 3.0 to exit)
                 </div>
 
-                <!-- ★★★ v15: 参照画像アップロードエリア (ここに追加) ★★★ -->
-                <div id="reference-image-area" class="hidden p-3 bg-gray-900/50 rounded-lg mt-3">
-                    <label class="block text-sm font-medium text-gray-300 mb-2">Reference Image (Optional)</label>
-                    <div id="reference-image-dropzone" class="flex items-center justify-center w-full h-24 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer hover:bg-gray-700 transition">
-                        <div id="reference-image-placeholder" class="text-center text-gray-500">
-                            <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-upload"></use></svg>
-                            <p class="text-xs mt-1">Drop reference image or click</p>
-                        </div>
-                        <div id="reference-image-preview" class="hidden w-full h-full p-1 relative group">
-                            <img id="reference-image-thumbnail" src="" class="w-full h-full object-contain rounded">
-                            <button id="reference-image-clear-btn" type="button" class="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition" data-tooltip="Remove reference image">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-x"></use></svg>
-                            </button>
-                        </div>
-                    </div>
-                    <input type="file" id="reference-image-input" class="hidden" accept="image/png, image/jpeg, image/webp">
-                </div>
-                <!-- ★★★ v15: 追加ここまで ★★★ -->
-
                 <!-- ★★★ 変更 (v14): ID追加 ★★★ -->
                 <div class="relative mt-4" id="prompt-input-area">
                     <textarea id="prompt-input" rows="2" class="block w-full p-4 pr-56 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Enter your prompt... (Non-English will be translated)"></textarea>
@@ -540,7 +520,7 @@
 
 
     <script>
-        // --- CONSTANTS & STATE (v15) ---
+        // --- CONSTANTS & STATE (v14) ---
         // (v13と同じ)
         const STYLES = [
             "Photorealistic", "Cinematic", "35mm film", "Black and white", "Impressionistic",
@@ -570,10 +550,6 @@
         let lastEnterPress = 0; 
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-        // ★★★ v15: 追加 ★★★
-        let currentReferenceImageBase64 = null; // 参照画像のBase64
-        // ★★★ v15: 追加ここまで ★★★
-
         // FG (フォアグラウンド) 用の変数
         let generationInProgress_FG = false; 
         let runningGenerations_FG = new Set(); 
@@ -592,7 +568,7 @@
         const MAX_ZOOM = 10, MIN_ZOOM = 0.5;
 
 
-        // --- DOM ELEMENTS (v15) ---
+        // --- DOM ELEMENTS (v14) ---
         // (v13と同じ要素)
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('main-content');
@@ -690,16 +666,7 @@
         // フッターエリア
         const promptInputArea = document.getElementById('prompt-input-area');
         const stylesToggleArea = document.getElementById('styles-toggle-area');
-        
-        // ★★★ v15: 追加 ★★★
-        const referenceImageArea = document.getElementById('reference-image-area');
-        const referenceImageDropzone = document.getElementById('reference-image-dropzone');
-        const referenceImagePlaceholder = document.getElementById('reference-image-placeholder');
-        const referenceImagePreview = document.getElementById('reference-image-preview');
-        const referenceImageThumbnail = document.getElementById('reference-image-thumbnail');
-        const referenceImageClearBtn = document.getElementById('reference-image-clear-btn');
-        const referenceImageInput = document.getElementById('reference-image-input');
-        // ★★★ v15: 追加ここまで ★★★
+        // ★★★ 追加ここまで ★★★
 
 
         // --- INITIALIZATION ---
@@ -1010,8 +977,8 @@
             container.appendChild(addBtnContainer);
         }
 
-        // --- EVENT LISTENERS (v15) ---
-        // ★★★ 変更 (v15): リスナー追加 ★★★
+        // --- EVENT LISTENERS (v14) ---
+        // ★★★ 変更 (v14): リスナー追加 ★★★
         function initListeners() {
             // 認証
             authForm.addEventListener('submit', handleAuthSubmit);
@@ -1088,23 +1055,14 @@
             // プロンプト入力 (Enterキー)
             promptInput.addEventListener('keydown', handlePromptKeydown);
 
-            // D&D (ベース画像)
+            // D&D
             imageDisplay.addEventListener('dragover', handleDragOver);
             imageDisplay.addEventListener('dragleave', handleDragLeave);
             imageDisplay.addEventListener('drop', handleDrop);
 
-            // ファイルアップロード (ベース画像)
+            // ファイルアップロード
             uploadImageButton.addEventListener('click', () => uploadImageInput.click());
             uploadImageInput.addEventListener('change', handleFileSelect);
-
-            // ★★★ v15: 参照画像のD&Dとアップロード ★★★
-            referenceImageDropzone.addEventListener('dragover', handleReferenceDragOver);
-            referenceImageDropzone.addEventListener('dragleave', handleReferenceDragLeave);
-            referenceImageDropzone.addEventListener('drop', handleReferenceDrop);
-            referenceImageDropzone.addEventListener('click', () => referenceImageInput.click());
-            referenceImageInput.addEventListener('change', handleReferenceFileSelect);
-            referenceImageClearBtn.addEventListener('click', handleReferenceClear);
-            // ★★★ v15: 追加ここまで ★★★
 
             // リサイズ
             window.addEventListener('resize', adjustMainContentPadding);
@@ -1167,21 +1125,34 @@
         }
 
 
-        // --- CORE LOGIC (v15) ---
+        // --- CORE LOGIC (v14) ---
        
    
-        // ★★★ 変更 (v14): Imagenモデルのみ初期化、デフォルトチェック削除 ★★★
+   // ★★★ 変更 (v14): Imagenモデルのみ初期化、デフォルトチェック削除 ★★★
         function initModels() {
             modelsContainer.innerHTML = "";
             for (const [modelId, modelInfo] of Object.entries(MODELS)) {
                 
-                // 'imagen' タイプのモデルのみをメインコンテナに追加
-                if (modelInfo.type !== 'imagen') continue;
+                // ★★★ 変更点 ★★★
+                // 'imagen' と 'gemini-edit' タイプをメインコンテナに追加 (v14改)
+                if (modelInfo.type !== 'imagen' && modelInfo.type !== 'gemini-edit') continue;
+                // ★★★ 変更ここまで ★★★
+
 
                 const inputId = `model-${modelId}`;
                 
+                // ★★★ 変更点 ★★★
                 let labelClass = "cursor-pointer text-gray-300 hover:bg-gray-700 p-2 rounded-md flex items-center border border-transparent";
-                let modelTypeIcon = `<svg class="w-4 h-4 mr-2 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>`;
+                let modelTypeIcon;
+
+                // タイプ別にアイコンを分ける (v14改)
+                if (modelInfo.type === 'imagen') {
+                    modelTypeIcon = `<svg class="w-4 h-4 mr-2 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-image"></use></svg>`;
+                } else { // gemini-edit
+                    modelTypeIcon = `<svg class="w-4 h-4 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><use href="#icon-edit"></use></svg>`;
+                }
+                // ★★★ 変更ここまで ★★★
+
 
                 const div = document.createElement('div');
                 div.innerHTML = `
@@ -1195,12 +1166,11 @@
                 div.querySelector('input').addEventListener('change', handleModelSelectionChange);
             }
             
-            // v14: デフォルト選択を削除
-            // v15: 4.0 Fastをデフォルト選択に戻す (利便性のため)
-            const defaultModel = document.getElementById('model-imagen-4.0-fast-generate-001');
-            if (defaultModel) {
-                defaultModel.checked = true;
-            }
+            // ★ v14: デフォルト選択を削除
+            // const defaultModel = document.getElementById('model-imagen-4.0-fast-generate-001');
+            // if (defaultModel) {
+            //     defaultModel.checked = true;
+            // } ... (削除)
 
             document.addEventListener('click', (e) => {
                 if (!modelSelectGroup.contains(e.target) && !modelsContainer.classList.contains('hidden')) {
@@ -1235,12 +1205,6 @@
                 div.querySelector('input').addEventListener('change', handleEditModelSelectionChange);
             }
             
-            // v15: 2.5 Flashをデフォルト選択
-            const defaultEditModel = document.getElementById('edit-model-gemini-2.5-flash-image-preview');
-            if (defaultEditModel) {
-                defaultEditModel.checked = true;
-            }
-
             document.addEventListener('click', (e) => {
                 if (!editModelSelectGroup.contains(e.target) && !editModelsContainer.classList.contains('hidden')) {
                     toggleEditModelsAccordion(false);
@@ -1499,7 +1463,7 @@
             updateGridColumns();
         }
 
-        // ★★★ 変更 (v15): toggleEditMode のロジック大幅変更 ★★★
+        // ★★★ 変更 (v14): toggleEditMode のロジック大幅変更 ★★★
         function toggleEditMode(forceOn) { 
             isEditingMode = forceOn;
             
@@ -1526,10 +1490,6 @@
                 imageDisplay.classList.add('ring-4', 'ring-indigo-500');
                 if (!stylesContainer.classList.contains('hidden')) { toggleStylesAccordion(); }
                 
-                // ★★★ v15: 参照画像エリアを表示 ★★★
-                referenceImageArea.classList.remove('hidden');
-                // ★★★ v15: 追加ここまで ★★★
-
                 editModeIndicator.textContent = `🎨 Editing Mode - Select Edit Models (2.0/2.5) to use.`;
                 editModeIndicator.classList.remove('hidden');
                 
@@ -1541,20 +1501,12 @@
                 modelSelectGroup.style.display = 'block';
                 editModelSelectGroup.style.display = 'none';
 
-                // Editモデルの選択を解除 (v15: デフォルトに戻す)
-                Array.from(document.querySelectorAll('.edit-model-checkbox')).forEach((cb, idx) => {
-                     // 2.5 Flash (先頭) だけ true
-                    cb.checked = (cb.value === "gemini-2.5-flash-image-preview"); 
-                });
-                updateEditModelsPreview(); 
+                // Editモデルの選択を解除
+                Array.from(document.querySelectorAll('.edit-model-checkbox')).forEach(cb => cb.checked = false);
+                updateEditModelsPreview(); // (None) にする
 
                 imageDisplay.classList.remove('ring-4', 'ring-indigo-500');
                 editModeIndicator.classList.add('hidden');
-                
-                // ★★★ v15: 参照画像エリアを非表示＆クリア ★★★
-                referenceImageArea.classList.add('hidden');
-                handleReferenceClear(); // 編集モード解除時に参照画像もクリア
-                // ★★★ v15: 追加ここまで ★★★
             }
             
             // ツールバー（Aspect/Styles/Retry）の表示を更新
@@ -1711,7 +1663,8 @@
         }
         
 
-        // --- (v13と同じ FG/BG/Fetchロジック ここから v15 修正あり) ---
+        // --- (v13と同じ FG/BG/Fetchロジック) ---
+        // (ここから下は v13 と v14 で変更はありません)
         
         async function handleGenerationSubmit_FG(finalPrompt, selectedModels, selectedStyles) {
             generationInProgress_FG = true;
@@ -1740,10 +1693,7 @@
                     keyIndex: apiKeyCounter, 
                     aspectRatio: aspectRatioSelect.value, 
                     styles: selectedStyles,
-                    baseImage: (isEditingMode || isGeminiJob) ? currentEditImageBase64 : null,
-                    // ★★★ v15: 追加 ★★★
-                    referenceImage: (isEditingMode || isGeminiJob) ? currentReferenceImageBase64 : null
-                    // ★★★ v15: 追加ここまで ★★★
+                    baseImage: (isEditingMode || isGeminiJob) ? currentEditImageBase64 : null
                 };
 
                 runningGenerations_FG.add(cardId);
@@ -1846,10 +1796,7 @@
                     model: modelId, 
                     aspectRatio: aspectRatioSelect.value, 
                     styles: selectedStyles,
-                    baseImage: (isEditingMode || isGeminiJob) ? currentEditImageBase64 : null,
-                    // ★★★ v15: 追加 ★★★
-                    referenceImage: (isEditingMode || isGeminiJob) ? currentReferenceImageBase64 : null
-                    // ★★★ v15: 追加ここまで ★★★
+                    baseImage: (isEditingMode || isGeminiJob) ? currentEditImageBase64 : null
                 };
 
                 try {
@@ -2181,62 +2128,6 @@
             if (prompt) { promptInput.value = prompt; } 
             else { promptInput.value = ""; }
         }
-        
-        // ★★★ v15: 参照画像ハンドラ (ここに追加) ★★★
-        function handleReferenceDragOver(event) {
-            event.preventDefault();
-            referenceImageDropzone.classList.add('drag-over'); // (drag-over スタイルは v14 CSS にあります)
-        }
-        function handleReferenceDragLeave(event) {
-            event.preventDefault();
-            referenceImageDropzone.classList.remove('drag-over');
-        }
-        function handleReferenceDrop(event) {
-            event.preventDefault();
-            referenceImageDropzone.classList.remove('drag-over');
-            const file = event.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                readReferenceImageFile(file);
-            } else {
-                showToast("Please drop an image file", "warning");
-            }
-        }
-        function handleReferenceFileSelect(event) {
-            const file = event.target.files[0];
-            if (file && file.type.startsWith('image/')) {
-                readReferenceImageFile(file);
-            }
-            referenceImageInput.value = null; // 同じファイルを選択できるように
-        }
-        function readReferenceImageFile(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const base64DataUrl = e.target.result;
-                currentReferenceImageBase64 = base64DataUrl.split(',')[1];
-                
-                referenceImageThumbnail.src = base64DataUrl;
-                referenceImagePlaceholder.classList.add('hidden');
-                referenceImagePreview.classList.remove('hidden');
-                showToast("Reference image loaded", "info");
-            };
-            reader.onerror = (e) => {
-                showToast("Failed to read reference image.", "error");
-                handleReferenceClear();
-            };
-            reader.readAsDataURL(file);
-        }
-        function handleReferenceClear(event) {
-            if (event) event.stopPropagation(); // Dropzoneのクリックイベントを発火させない
-            
-            currentReferenceImageBase64 = null;
-            referenceImageThumbnail.src = "";
-            referenceImagePlaceholder.classList.remove('hidden');
-            referenceImagePreview.classList.add('hidden');
-            referenceImageInput.value = null;
-            console.log("Reference image cleared.");
-        }
-        // ★★★ v15: 追加ここまで ★★★
-
         
         // (v13と同じ)
         function createImageCard(cardId, modelName, isBGMode = false) {
